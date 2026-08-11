@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "Power BI Web Analytics"
+description = "A polished React analytics dashboard inspired by an existing Power BI report, with interactive filters, KPI summaries, rich data visualizations, multi-page navigation, and a structure ready to connect to relational data and DAX-derived metrics."
+version = "1.0.0"
+id = "artifacts/power-bi-web"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23559
+
+[services.development]
+run = "pnpm --filter @workspace/power-bi-web run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/power-bi-web", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/power-bi-web/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23559"
+BASE_PATH = "/"
