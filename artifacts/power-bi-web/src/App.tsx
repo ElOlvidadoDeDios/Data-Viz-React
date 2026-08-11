@@ -54,10 +54,10 @@ const topCustomers = [
 ];
 
 const viewMeta: Record<View, { label: string; eyebrow: string; title: string; subtitle: string }> = {
-  resumen: { label: 'Resumen ejecutivo', eyebrow: 'Lectura general del negocio', title: 'El negocio está tomando impulso.', subtitle: 'Una vista de 30 segundos para saber dónde poner la atención hoy.' },
-  ventas: { label: 'Ventas', eyebrow: 'Ritmo comercial', title: 'La curva comercial se mantiene por encima del plan.', subtitle: 'Evolución, mezcla y productividad para decidir el siguiente movimiento.' },
-  clientes: { label: 'Clientes', eyebrow: 'Valor de cartera', title: 'Las cuentas clave están sosteniendo el crecimiento.', subtitle: 'Retención y concentración de clientes para proteger el ingreso futuro.' },
-  regiones: { label: 'Regiones', eyebrow: 'Cobertura de mercado', title: 'Centro acelera; Exportación abre una nueva frontera.', subtitle: 'Compara mercados, descubre oportunidades y asigna cobertura con criterio.' },
+  resumen: { label: 'Reporte Gerencia', eyebrow: 'Lectura general de la operación', title: 'La colocación avanza con foco y control.', subtitle: 'Una vista de 30 segundos para entender metas, avance y alertas del negocio.' },
+  ventas: { label: 'Supervisión Agencias', eyebrow: 'Desempeño por agencia', title: 'Cada agencia tiene una oportunidad distinta.', subtitle: 'Compara colocación, mora, duración y avance contra meta para priorizar la gestión.' },
+  clientes: { label: 'Supervisión Asesores', eyebrow: 'Seguimiento de equipos', title: 'La productividad se construye asesor por asesor.', subtitle: 'Identifica quién está logrando el plan y dónde hace falta acompañamiento.' },
+  regiones: { label: 'Productividad', eyebrow: 'Ritmo de colocación', title: 'El objetivo del mes se vuelve alcanzable.', subtitle: 'Monitorea días laborales, meta, logrado y proyección para anticiparte al cierre.' },
 };
 
 function formatMoney(value: number, decimals = 2) {
@@ -73,16 +73,16 @@ function Dashboard() {
   const [location, setLocation] = useLocation();
   const pathView = location.slice(1) as View;
   const activeView: View = viewMeta[pathView] ? pathView : 'resumen';
-  const [filters, setFilters] = useState<Filters>({ period: 'Últimos 12 meses', region: 'Todas las regiones', category: 'Todas las categorías', channel: 'Todos los canales' });
+  const [filters, setFilters] = useState<Filters>({ period: '202606', region: 'Todas las agencias', category: 'Todos los cargos', channel: 'Todos los asesores' });
   const [mobileNav, setMobileNav] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showFilters, setShowFilters] = useState(true);
   const [lastUpdated, setLastUpdated] = useState('hace 8 min');
   const meta = viewMeta[activeView];
-  const filterActive = Object.values(filters).some((x) => !x.startsWith('Todas') && !x.startsWith('Todos') && x !== 'Últimos 12 meses');
+  const filterActive = Object.values(filters).some((x) => !x.startsWith('Todas') && !x.startsWith('Todos') && x !== '202606');
 
   const navigate = (view: View) => { setLocation(view === 'resumen' ? '/' : `/${view}`); setMobileNav(false); };
-  const resetFilters = () => { setFilters({ period: 'Últimos 12 meses', region: 'Todas las regiones', category: 'Todas las categorías', channel: 'Todos los canales' }); toast.success('Filtros restablecidos'); };
+  const resetFilters = () => { setFilters({ period: '202606', region: 'Todas las agencias', category: 'Todos los cargos', channel: 'Todos los asesores' }); toast.success('Filtros restablecidos'); };
   const refresh = () => { setIsRefreshing(true); setTimeout(() => { setIsRefreshing(false); setLastUpdated('justo ahora'); toast.success('Datos demostrativos actualizados'); }, 650); };
 
   return (
@@ -96,7 +96,7 @@ function Dashboard() {
         <div className="flex-1 px-4 py-7">
           <div className="mb-3 px-3 font-mono text-[10px] uppercase tracking-[.16em] text-[hsl(var(--sidebar-foreground)/.42)]">Espacio de trabajo</div>
           <nav className="space-y-1">
-            {([['resumen', 'Resumen ejecutivo', LayoutDashboard], ['ventas', 'Ventas', TrendingUp], ['clientes', 'Clientes', Users], ['regiones', 'Regiones', Building2] ] as const).map(([view, label, Icon]) => (
+            {([['resumen', 'Reporte Gerencia', LayoutDashboard], ['ventas', 'Supervisión Agencias', Building2], ['clientes', 'Supervisión Asesores', Users], ['regiones', 'Productividad', TrendingUp] ] as const).map(([view, label, Icon]) => (
               <button key={view} data-testid={`button-nav-${view}`} onClick={() => navigate(view)} className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-semibold transition-all ${activeView === view ? 'bg-[hsl(var(--sidebar-accent))] text-[hsl(var(--sidebar-accent-foreground))] shadow-[inset_3px_0_0_hsl(var(--sidebar-primary))]' : 'text-[hsl(var(--sidebar-foreground)/.64)] hover:bg-[hsl(var(--sidebar-accent)/.7)] hover:text-[hsl(var(--sidebar-foreground))]'}`}><Icon size={17} strokeWidth={activeView === view ? 2.4 : 1.8} /><span>{label}</span>{activeView === view && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[hsl(var(--sidebar-primary))]" />}</button>
             ))}
           </nav>
@@ -108,7 +108,7 @@ function Dashboard() {
         </div>
         <div className="m-4 rounded-2xl border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent)/.55)] p-4">
           <div className="mb-3 flex items-center justify-between"><span className="font-mono text-[9px] uppercase tracking-[.13em] text-[hsl(var(--sidebar-foreground)/.5)]">Modelo de datos</span><span className="flex items-center gap-1 text-[10px] text-[hsl(var(--sidebar-primary))]"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--sidebar-primary))] animate-pulse-soft" />Demo local</span></div>
-          <div className="text-[12px] leading-5 text-[hsl(var(--sidebar-foreground)/.7)]">Listo para conectar<br />ventas · clientes · regiones</div>
+          <div className="text-[12px] leading-5 text-[hsl(var(--sidebar-foreground)/.7)]">PBIX inspeccionado<br />agencias · asesores · flujo</div>
         </div>
         <div className="flex items-center gap-3 border-t border-[hsl(var(--sidebar-border))] px-6 py-5"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--accent))] font-display text-xs font-bold text-[hsl(var(--accent-foreground))]">MR</div><div className="min-w-0"><div className="truncate text-xs font-semibold">Mariana Ríos</div><div className="truncate text-[10px] text-[hsl(var(--sidebar-foreground)/.48)]">Dirección comercial</div></div><MoreHorizontal size={17} className="ml-auto text-[hsl(var(--sidebar-foreground)/.5)]" /></div>
       </aside>
@@ -116,17 +116,17 @@ function Dashboard() {
       <main className="min-h-[100dvh] md:pl-[256px]">
         <header className="sticky top-0 z-10 border-b border-border/70 bg-[hsl(var(--background)/.86)] px-5 py-4 backdrop-blur-xl sm:px-8 lg:px-11">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3"><button data-testid="button-open-navigation" className="rounded-xl border border-border bg-card p-2 md:hidden" onClick={() => setMobileNav(true)}><Menu size={19} /></button><div><div className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">{meta.eyebrow}</div><div className="mt-1 text-xs text-muted-foreground">Miércoles, 18 de diciembre de 2024</div></div></div>
+            <div className="flex items-center gap-3"><button data-testid="button-open-navigation" className="rounded-xl border border-border bg-card p-2 md:hidden" onClick={() => setMobileNav(true)}><Menu size={19} /></button><div><div className="font-mono text-[10px] uppercase tracking-[.18em] text-muted-foreground">{meta.eyebrow}</div><div className="mt-1 text-xs text-muted-foreground">Periodo de gestión · Junio 2026</div></div></div>
             <div className="flex items-center gap-2"><button data-testid="button-search" onClick={() => toast.info('Búsqueda global disponible en la siguiente versión')} className="hidden rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition-colors hover:text-foreground sm:block"><Search size={17} /></button><button data-testid="button-notifications" onClick={() => toast.info('No hay alertas nuevas')} className="relative rounded-xl border border-border bg-card p-2.5 text-muted-foreground transition-colors hover:text-foreground"><Bell size={17} /><span className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full bg-[hsl(var(--accent))]" /></button><div className="mx-1 hidden h-7 w-px bg-border sm:block" /><button data-testid="button-profile" onClick={() => toast.info('Perfil de Mariana Ríos')} className="flex items-center gap-2 rounded-xl px-1.5 py-1 text-left hover:bg-[hsl(var(--muted)/.5)]"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-[hsl(var(--primary))] text-[11px] font-bold text-[hsl(var(--primary-foreground))]">MR</span><span className="hidden text-xs font-semibold sm:block">Mariana Ríos</span><ChevronDown size={14} className="hidden text-muted-foreground sm:block" /></button></div>
           </div>
         </header>
         <div className="px-5 py-7 sm:px-8 lg:px-11 lg:py-9">
           <div className="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-            <div className="animate-rise"><div className="mb-2 flex items-center gap-2 text-xs font-semibold text-[hsl(var(--primary))]"><span className="h-2 w-2 rounded-full bg-[hsl(var(--primary))]" />Reporte operativo · Demo local</div><h1 data-testid="text-page-title" className="font-display max-w-2xl text-[30px] font-bold leading-[1.08] tracking-[-.045em] sm:text-[39px]">{meta.title}</h1><p className="mt-3 max-w-xl text-[14px] leading-6 text-muted-foreground">{meta.subtitle}</p></div>
+            <div className="animate-rise"><div className="mb-2 flex items-center gap-2 text-xs font-semibold text-[hsl(var(--primary))]"><span className="h-2 w-2 rounded-full bg-[hsl(var(--primary))]" />Modelo PBIX · Demo local</div><h1 data-testid="text-page-title" className="font-display max-w-2xl text-[30px] font-bold leading-[1.08] tracking-[-.045em] sm:text-[39px]">{meta.title}</h1><p className="mt-3 max-w-xl text-[14px] leading-6 text-muted-foreground">{meta.subtitle}</p></div>
             <div className="flex flex-wrap items-center gap-2"><button data-testid="button-refresh" onClick={refresh} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-semibold text-muted-foreground shadow-sm transition hover:text-foreground"><RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />Actualizar</button><button data-testid="button-export" onClick={() => toast.success('Vista preparada para exportar', { description: 'La descarga estará disponible al conectar el modelo real.' })} className="flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-semibold text-muted-foreground shadow-sm transition hover:text-foreground"><Download size={14} />Exportar</button><button data-testid="button-share" onClick={() => { navigator.clipboard?.writeText(window.location.href); toast.success('Enlace copiado'); }} className="flex items-center gap-2 rounded-xl bg-[hsl(var(--primary))] px-3.5 py-2.5 text-xs font-semibold text-[hsl(var(--primary-foreground))] shadow-sm transition hover:brightness-110"><Share2 size={14} />Compartir</button></div>
           </div>
           <FilterBar filters={filters} setFilters={setFilters} showFilters={showFilters} setShowFilters={setShowFilters} filterActive={filterActive} resetFilters={resetFilters} />
-          <div className="mb-6 flex items-center justify-between text-[11px] text-muted-foreground"><span>Actualizado {lastUpdated} · Fuente: modelo demostrativo</span><button data-testid="button-data-definition" onClick={() => toast.info('Las medidas están expresadas en millones de pesos mexicanos')} className="flex items-center gap-1.5 hover:text-foreground"><CircleHelp size={13} />¿Cómo se calcula?</button></div>
+          <div className="mb-6 flex items-center justify-between text-[11px] text-muted-foreground"><span>Actualizado {lastUpdated} · Fuente: datos demostrativos del PBIX</span><button data-testid="button-data-definition" onClick={() => toast.info('Medidas detectadas: meta, logrado, proyección, faltante, avance y productividad')} className="flex items-center gap-1.5 hover:text-foreground"><CircleHelp size={13} />¿Cómo se calcula?</button></div>
           <DashboardView activeView={activeView} filters={filters} isRefreshing={isRefreshing} navigate={navigate} />
         </div>
       </main>
@@ -136,10 +136,10 @@ function Dashboard() {
 
 function FilterBar({ filters, setFilters, showFilters, setShowFilters, filterActive, resetFilters }: { filters: Filters; setFilters: React.Dispatch<React.SetStateAction<Filters>>; showFilters: boolean; setShowFilters: (value: boolean) => void; filterActive: boolean; resetFilters: () => void }) {
   const options: { key: keyof Filters; label: string; values: string[] }[] = [
-    { key: 'period', label: 'Periodo', values: ['Últimos 12 meses', 'Últimos 6 meses', 'Este año', 'Trimestre actual'] },
-    { key: 'region', label: 'Región', values: ['Todas las regiones', 'Norte', 'Centro', 'Occidente', 'Sur', 'Exportación'] },
-    { key: 'category', label: 'Categoría', values: ['Todas las categorías', 'Tecnología', 'Servicios', 'Equipamiento', 'Consultoría'] },
-    { key: 'channel', label: 'Canal', values: ['Todos los canales', 'Directo', 'Partners', 'Digital'] },
+    { key: 'period', label: 'Periodo', values: ['202606', '202605', '202604', '202603'] },
+    { key: 'region', label: 'Agencia', values: ['Todas las agencias', 'Agencia Lima', 'Agencia Norte', 'Agencia Centro', 'Agencia Sur'] },
+    { key: 'category', label: 'Cargo', values: ['Todos los cargos', 'ANALISTA DE CREDITOS I', 'RECUPERADOR'] },
+    { key: 'channel', label: 'Asesor', values: ['Todos los asesores', 'Alexandra DA', 'Asesor demo 02', 'Asesor demo 03'] },
   ];
   return <section className="mb-4 rounded-2xl border border-border bg-card p-3 shadow-[var(--shadow-soft)]">
     <div className="flex flex-wrap items-center gap-2"><button data-testid="button-toggle-filters" onClick={() => setShowFilters(!showFilters)} className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold ${showFilters ? 'bg-[hsl(var(--primary)/.1)] text-[hsl(var(--primary))]' : 'text-muted-foreground hover:bg-muted'}`}><Filter size={14} />Filtros{filterActive && <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-[hsl(var(--accent))] px-1 font-mono text-[9px] text-[hsl(var(--accent-foreground))]">!</span>}</button>{showFilters && options.map(({ key, label, values }) => <label key={key} className="relative flex items-center gap-2 rounded-xl border border-border bg-[hsl(var(--background)/.65)] px-3 py-2 text-xs"><span className="text-muted-foreground">{label}</span><select data-testid={`select-filter-${key}`} value={filters[key]} onChange={(e) => setFilters((current) => ({ ...current, [key]: e.target.value }))} className="max-w-[145px] cursor-pointer appearance-none bg-transparent pr-4 font-semibold outline-none"><option>{values[0]}</option>{values.slice(1).map((value) => <option key={value}>{value}</option>)}</select><ChevronDown size={12} className="pointer-events-none absolute right-2.5 text-muted-foreground" /></label>)}<div className="ml-auto flex items-center gap-2">{filterActive && <button data-testid="button-reset-filters" onClick={resetFilters} className="flex items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted hover:text-foreground"><RefreshCw size={13} />Limpiar</button>}<span className="hidden items-center gap-1.5 border-l border-border pl-3 text-[10px] text-muted-foreground md:flex"><span className="h-1.5 w-1.5 rounded-full bg-[hsl(var(--primary))]" />Sincronizado</span></div></div>
