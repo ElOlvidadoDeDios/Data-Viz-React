@@ -10,15 +10,15 @@ import {
 } from 'lucide-react';
 
 // === IMPORTACIÓN DE ARCHIVOS MODULARES ===
-import { View, viewMeta, Filters } from './utils/constants';
-import { FilterBar } from './components/FilterBar';
+import { View, viewMeta, Filters } from '../../power-bi-web/src/utils/constants';
+import { FilterBar } from '../../power-bi-web/src/components/FilterBar';
 
-import { GerenciaView } from './views/GerenciaView';
-import { SupervisionAgenciasView } from './views/SupervisionAgenciasView';
-import { AgenciaView } from './views/AgenciaView';
-import { AsesoresView } from './views/AsesoresView';
-import { ColocacionesView } from './views/ColocacionesView';
-import { PreventivaView } from './views/ProductividadDiaria';
+import { GerenciaView } from '../../power-bi-web/src/views/GerenciaView';
+import { SupervisionAgenciasView } from '../../power-bi-web/src/views/SupervisionAgenciasView';
+import { AgenciaView } from '../../power-bi-web/src/views/AgenciaView';
+import { AsesoresView } from '../../power-bi-web/src/views/AsesoresView';
+import { ColocacionesView } from '../../power-bi-web/src/views/ColocacionesView';
+import { PreventivaView } from '../../power-bi-web/src/views/ProductividadDiaria';
 
 const queryClient = new QueryClient();
 

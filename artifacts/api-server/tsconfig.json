@@ -7,7 +7,7 @@
     "rootDir": "src",
     "types": ["node"]
   },
-  "include": ["src"],
+  "include": ["src", "../power-bi-web/src/components/WorkdayStrip.tsx", "../power-bi-web/src/components/FilterBar.tsx", "../power-bi-web/src/components/ui/GaugeChart.tsx", "../power-bi-web/src/components/ui/KpiCard.tsx", "../power-bi-web/src/components/ui/LoadingState.tsx", "../power-bi-web/src/components/ui/Panel.tsx", "../power-bi-web/src/components/ui/SectionBand.tsx", "../power-bi-web/src/components/ui/StatusCell.tsx", "../power-bi-web/src/components/ui/TableShell.tsx", "../power-bi-web/src/views", "../power-bi-web/src/utils"],
   "references": [
     {
       "path": "../../lib/db"
