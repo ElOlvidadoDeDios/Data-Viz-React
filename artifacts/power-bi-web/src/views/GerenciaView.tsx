@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, Line, Legend, Area } from 'recharts';
+import { ResponsiveContainer, ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, Bar, Line, Legend, Area, Cell } from 'recharts';
 import { TrendingUp, Target, Building2, AlertTriangle, RefreshCw } from 'lucide-react';
 
 import { Filters, View } from '../utils/constants';
-import { money, number } from '../utils/formatters';
+import { money } from '../utils/formatters';
 import { LoadingState } from '../components/ui/LoadingState';
 import { SectionBand } from '../components/ui/SectionBand';
 import { Panel } from '../components/ui/Panel';
@@ -13,24 +13,33 @@ import { KpiCard } from '../components/ui/KpiCard';
 import { WorkdayStrip } from '../components/WorkdayStrip';
 
 // 1. MICRO-COMPONENTE: Velocímetro de 180 grados
-function HalfGauge({ value, title, color = '#15803d' }: { value: number; title: string; color?: string }) {
-  const radius = 80;
-  const stroke = 26;
+function HalfGauge({ value, title, color = '#16a34a' }: { value: number; title: string; color?: string }) {
+  const radius = 70;
+  const stroke = 22;
   const normalizedValue = Math.min(Math.max(value, 0), 100);
   const circumference = Math.PI * radius;
   const strokeDashoffset = circumference - (normalizedValue / 100) * circumference;
 
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card p-4 shadow-sm">
-      <div className="mb-4 font-mono text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</div>
-      <div className="relative flex items-end justify-center overflow-hidden" style={{ width: '200px', height: '100px' }}>
-        <svg width="200" height="200" className="absolute top-0 transform transition-transform duration-1000">
-          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} strokeLinecap="round" />
-          <path d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} className="transition-all duration-1000 ease-out" />
+    <div className="flex flex-col items-center justify-center rounded-xl border border-border/70 bg-card p-4 shadow-sm">
+      <div className="mb-3 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{title}</div>
+      <div className="relative flex items-end justify-center overflow-hidden" style={{ width: '180px', height: '90px' }}>
+        <svg width="180" height="180" className="absolute top-0">
+          <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="hsl(var(--muted))" strokeWidth={stroke} strokeLinecap="round" />
+          <path 
+            d="M 20 90 A 70 70 0 0 1 160 90" 
+            fill="none" 
+            stroke={color} 
+            strokeWidth={stroke} 
+            strokeLinecap="round" 
+            strokeDasharray={circumference} 
+            strokeDashoffset={strokeDashoffset} 
+            className="transition-all duration-1000 ease-out" 
+          />
         </svg>
-        <div className="absolute bottom-1 text-center font-display text-4xl font-bold">{value}%</div>
-        <div className="absolute bottom-0 left-2 font-mono text-[10px] text-muted-foreground">0%</div>
-        <div className="absolute bottom-0 right-1 font-mono text-[10px] text-muted-foreground">100%</div>
+        <div className="absolute bottom-1 text-center text-3xl font-bold tracking-tight">{value}%</div>
+        <div className="absolute bottom-0 left-2 text-[10px] text-muted-foreground">0%</div>
+        <div className="absolute bottom-0 right-2 text-[10px] text-muted-foreground">100%</div>
       </div>
     </div>
   );
@@ -83,12 +92,17 @@ export function GerenciaView({ navigate, filters }: { navigate: (view: View) => 
   });
 
   if (isLoading || !indicadoresBD) return <LoadingState />;
-  if (error) return <div className="p-5 text-red-500 font-bold border border-red-200 bg-red-50 rounded-xl">Error de conexión al DWH.</div>;
+  if (error) return <div className="p-5 text-destructive font-semibold border border-destructive/20 bg-destructive/10 rounded-xl">Error de conexión al DWH.</div>;
 
-  const datosFiltrados = (indicadoresBD.comercial || []).filter((row: any) => filters.agency === 'Todas' ? true : row.agency === filters.agency);
-  const datosNormalizacion = (indicadoresBD.normalizacion || []).filter((row: any) => filters.agency === 'Todas' ? true : row.agency === filters.agency);
+  // DATA COMPLETA (Para gráficos con contexto global)
+  const todasComercial = indicadoresBD.comercial || [];
+  const todasNormalizacion = indicadoresBD.normalizacion || [];
 
-  // Cálculos Comerciales
+  // DATA FILTRADA (Para la tabla si el usuario selecciona una agencia específica)
+  const datosFiltrados = todasComercial.filter((row: any) => filters.agency === 'Todas' ? true : row.agency === filters.agency);
+  const datosNormalizacion = todasNormalizacion.filter((row: any) => filters.agency === 'Todas' ? true : row.agency === filters.agency);
+
+  // Cálculos Comerciales (basados en la selección activa)
   const totalOpLogradas = datosFiltrados.reduce((sum: number, row: any) => sum + Number(row.opAchieved || 0), 0);
   const totalOpMeta = datosFiltrados.reduce((sum: number, row: any) => sum + Number(row.opTarget || 0), 0);
   const pctAvanceOperaciones = totalOpMeta > 0 ? Math.round((totalOpLogradas / totalOpMeta) * 100) : 0;
@@ -114,32 +128,39 @@ export function GerenciaView({ navigate, filters }: { navigate: (view: View) => 
   const totNormCrecNeto30 = datosNormalizacion.reduce((sum: number, row: any) => sum + Number(row.crecNeto30 || 0), 0);
   const avgNormPctMora = totNormCartera > 0 ? (totNormMoraCPP / totNormCartera) * 100 : 0;
 
+  // Helper para resaltar barras de Recharts
+  const getBarColor = (entryAgency: string, activeColor: string) => {
+    if (filters.agency === 'Todas') return activeColor;
+    return entryAgency === filters.agency ? '#f59e0b' : '#cbd5e1'; // Ámbar para la seleccionada, gris claro para las demás
+  };
+
   const defColumnasComercial = [
-    { id: 'agency', header: 'Agencia', align: 'left', cell: (row: any) => <span className="font-semibold">{row.agency}</span>, footer: () => 'Total Comercial' },
+    { id: 'agency', header: 'Agencia', align: 'left', cell: (row: any) => <span className="font-semibold text-xs">{row.agency}</span>, footer: () => 'Total Comercial' },
     { id: 'cartera', header: 'Cartera', align: 'right', cell: (row: any) => money(row.cartera), footer: () => money(totCartera) },
     { id: 'crecimiento', header: 'Crecimiento', align: 'right', 
-      cell: (row: any) => <span className={`font-semibold ${row.crecimientoBruto >= 0 ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--destructive))]'}`}>{row.crecimientoBruto >= 0 ? '+' : ''}{money(row.crecimientoBruto)}</span>, 
-      footer: () => <span className={totCrecimientoBruto >= 0 ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--destructive))]'}>{totCrecimientoBruto >= 0 ? '+' : ''}{money(totCrecimientoBruto)}</span> 
+      cell: (row: any) => <span className={`font-semibold ${row.crecimientoBruto >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{row.crecimientoBruto >= 0 ? '+' : ''}{money(row.crecimientoBruto)}</span>, 
+      footer: () => <span className={totCrecimientoBruto >= 0 ? 'text-emerald-600' : 'text-rose-600'}>{totCrecimientoBruto >= 0 ? '+' : ''}{money(totCrecimientoBruto)}</span> 
     },
-    { id: 'nroOper', header: 'Nro Oper', align: 'right', cell: (row: any) => <span className="font-mono bg-[hsl(var(--accent)/.1)] px-1">{row.opAchieved}</span>, footer: () => totalOpLogradas },
+    { id: 'nroOper', header: 'Nro Oper', align: 'center', cell: (row: any) => <span className="font-mono bg-muted px-2 py-0.5 rounded text-xs">{row.opAchieved}</span>, footer: () => totalOpLogradas },
     { id: 'desembolsos', header: 'Desembolsos', align: 'right', cell: (row: any) => money(row.amountAchieved), footer: () => money(totalMontoLogrado) },
     { id: 'repagos', header: 'Repagos', align: 'right', cell: (row: any) => money(row.repagos), footer: () => money(totRepagos) },
-    { id: 'duracion', header: 'Duración', align: 'right', cell: (row: any) => <span className="font-mono">{Number(row.duration).toFixed(2)}</span>, footer: () => <span className="font-mono">{avgDuracion.toFixed(2)}</span> },
-    { id: 'moraCPP', header: 'Mora CPP', align: 'right', cell: (row: any) => <span className={row.cpp > 10 ? 'text-[hsl(var(--destructive))]' : ''}>{money(row.moraCPP_soles)}</span>, footer: () => money(totMoraCPP) },
-    { id: 'pctMora', header: '% Mora', align: 'right', cell: (row: any) => <span className={row.cpp > 10 ? 'bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))] font-bold px-1' : ''}>{Number(row.cpp).toFixed(2)}%</span>, footer: () => `${avgPctMora.toFixed(2)}%` },
+    { id: 'duracion', header: 'Duración', align: 'center', cell: (row: any) => <span className="font-mono text-xs">{Number(row.duration).toFixed(2)}</span>, footer: () => <span className="font-mono text-xs">{avgDuracion.toFixed(2)}</span> },
+    { id: 'moraCPP', header: 'Mora CPP', align: 'right', cell: (row: any) => <span className={row.cpp > 10 ? 'text-rose-600 font-semibold' : ''}>{money(row.moraCPP_soles)}</span>, footer: () => money(totMoraCPP) },
+    { id: 'pctMora', header: '% Mora', align: 'right', cell: (row: any) => <span className={`px-2 py-0.5 rounded text-xs ${row.cpp > 10 ? 'bg-rose-500/10 text-rose-600 font-bold' : 'font-semibold text-rose-600'}`}>{Number(row.cpp).toFixed(2)}%</span>, footer: () => `${avgPctMora.toFixed(2)}%` },
     { id: 'moraDef', header: 'Mora Defic.', align: 'right', cell: (row: any) => money(row.moraDeficiente_soles), footer: () => money(totMoraDeficiente) },
     { id: 'crecNeto150', header: 'Crec. Neto 150', align: 'right', 
-      cell: (row: any) => <span className={`font-bold ${row.crecimientoNeto150 >= 0 ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--destructive))]'}`}>{row.crecimientoNeto150 >= 0 ? '+' : ''}{money(row.crecimientoNeto150)}</span>, 
-      footer: () => <span className={totCrecimientoNeto150 >= 0 ? 'text-[hsl(var(--primary))]' : 'text-[hsl(var(--destructive))]'}>{totCrecimientoNeto150 >= 0 ? '+' : ''}{money(totCrecimientoNeto150)}</span> 
+      cell: (row: any) => <span className={`font-bold ${row.crecimientoNeto150 >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{row.crecimientoNeto150 >= 0 ? '+' : ''}{money(row.crecimientoNeto150)}</span>, 
+      footer: () => <span className={totCrecimientoNeto150 >= 0 ? 'text-emerald-600' : 'text-rose-600'}>{totCrecimientoNeto150 >= 0 ? '+' : ''}{money(totCrecimientoNeto150)}</span> 
     }
   ];
 
   const columnasRender = order.map(id => defColumnasComercial.find(c => c.id === id)!);
 
   return (
-    <div className="space-y-8" key={filters.period}>
+    <div className="space-y-6 animate-in fade-in duration-500" key={filters.period}>
       <WorkdayStrip periodo={filters.period} />
       
+      {/* TARJETAS PRINCIPALES */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard label="Colocación acumulada" value={money(totalMontoLogrado)} note="Logrado a la fecha" icon={TrendingUp} delta={`+${pctAvanceMontos}%`} />
         <KpiCard label="Meta mensual" value={money(totalMontoMeta)} note="Monto objetivo" icon={Target} tone="gold" />
@@ -147,268 +168,310 @@ export function GerenciaView({ navigate, filters }: { navigate: (view: View) => 
         <KpiCard label="Excedente Mora CPP" value={money(totExcedenteMora)} note="Sobre la meta del 10%" icon={AlertTriangle} tone={totExcedenteMora > 0 ? "red" : "teal"} delta={totExcedenteMora > 0 ? "Excede" : "OK"} />
       </div>
 
+      {/* SECCIÓN 1: MATRIZ GENERAL */}
       <SectionBand tone="green">Indicadores de Crecimiento Global</SectionBand>
       <Panel 
         title="Matriz General de Resultados" 
         eyebrow="Flujo, Duración y Riesgo consolidado"
-        action={isModified && (<button onClick={resetOrder} className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm transition hover:text-foreground"><RefreshCw size={13} /> Restablecer columnas</button>)}
+        action={isModified && (
+          <button onClick={resetOrder} className="flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-semibold text-muted-foreground shadow-sm transition hover:text-foreground">
+            <RefreshCw size={13} /> Restablecer columnas
+          </button>
+        )}
       >
-        <div className="mb-5 flex w-full max-w-sm rounded-lg bg-muted/60 p-1 font-semibold">
-          <button onClick={() => setTipoCartera('comercial')} className={`flex-1 rounded-md py-2 text-xs transition-all ${tipoCartera === 'comercial' ? 'bg-white text-[hsl(var(--primary))] shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Cartera Comercial</button>
-          <button onClick={() => setTipoCartera('normalizacion')} className={`flex-1 rounded-md py-2 text-xs transition-all ${tipoCartera === 'normalizacion' ? 'bg-white text-[hsl(var(--primary))] shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Cartera Normalización</button>
+        <div className="mb-4 flex w-full max-w-xs rounded-lg bg-muted/60 p-1 font-semibold">
+          <button onClick={() => setTipoCartera('comercial')} className={`flex-1 rounded-md py-1.5 text-xs transition-all ${tipoCartera === 'comercial' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Comercial</button>
+          <button onClick={() => setTipoCartera('normalizacion')} className={`flex-1 rounded-md py-1.5 text-xs transition-all ${tipoCartera === 'normalizacion' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Normalización</button>
         </div>
 
         {tipoCartera === 'comercial' ? (
-          <div key="vista-comercial" className="animate-in fade-in zoom-in-95 duration-200">
-            <TableShell minWidth="1200px">
-              <table className="w-full text-[13px] whitespace-nowrap">
-                <thead>
-                  <tr className="border-b border-border bg-[hsl(138_72%_32%/.08)]">
-                    {columnasRender.map((col) => (
-                      <th key={col.id} draggable onDragStart={(e) => handleDragStart(e, col.id)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)} title="Arrastra para mover la columna" className={`px-4 py-3.5 font-bold text-[hsl(138_72%_25%)] cursor-grab active:cursor-grabbing transition-colors hover:bg-[hsl(138_72%_32%/.12)] ${col.align === 'left' ? 'text-left' : 'text-right'}`}>
-                        {col.header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {datosFiltrados.map((row: any) => (
-                    <tr key={row.agency} className="hover:bg-muted/20 transition-colors">
-                      {columnasRender.map((col) => (
-                        <td key={`${row.agency}-${col.id}`} className={`px-4 py-3 ${col.align === 'left' ? 'text-left' : 'text-right'}`}>{col.cell(row)}</td>
-                      ))}
-                    </tr>
+          <div key="vista-comercial" className="overflow-x-auto pb-2">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground">
+                  {columnasRender.map((col) => (
+                    <th key={col.id} draggable onDragStart={(e) => handleDragStart(e, col.id)} onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, col.id)} className={`px-3 pb-2.5 font-semibold cursor-grab active:cursor-grabbing hover:text-foreground ${col.align === 'left' ? 'text-left' : col.align === 'center' ? 'text-center' : 'text-right'}`}>
+                      {col.header}
+                    </th>
                   ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 border-border font-bold bg-muted/30">
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {datosFiltrados.map((row: any) => (
+                  <tr key={row.agency} className="hover:bg-muted/30 transition-colors">
                     {columnasRender.map((col) => (
-                      <td key={`footer-${col.id}`} className={`px-4 py-3 ${col.align === 'left' ? 'text-left' : 'text-right'}`}>{col.footer()}</td>
+                      <td key={`${row.agency}-${col.id}`} className={`px-3 py-2.5 ${col.align === 'left' ? 'text-left' : col.align === 'center' ? 'text-center' : 'text-right font-mono'}`}>{col.cell(row)}</td>
                     ))}
                   </tr>
-                </tfoot>
-              </table>
-            </TableShell>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border font-bold bg-muted/20">
+                  {columnasRender.map((col) => (
+                    <td key={`footer-${col.id}`} className={`px-3 py-2.5 ${col.align === 'left' ? 'text-left' : col.align === 'center' ? 'text-center' : 'text-right font-mono'}`}>{col.footer()}</td>
+                  ))}
+                </tr>
+              </tfoot>
+            </table>
           </div>
         ) : (
-          <div key="vista-normalizacion" className="animate-in fade-in zoom-in-95 duration-200">
-            <TableShell minWidth="1000px">
-              <table className="w-full text-[13px] whitespace-nowrap">
-                <thead>
-                  <tr className="border-b border-border bg-[hsl(138_72%_32%/.08)]">
-                    <th className="px-4 py-3.5 text-left font-bold text-[hsl(138_72%_25%)]">Agencia</th>
-                    <th className="px-4 py-3.5 text-left font-bold text-[hsl(138_72%_25%)]">Recuperador</th>
-                    <th className="px-4 py-3.5 text-right font-bold text-[hsl(138_72%_25%)]">Cartera</th>
-                    <th className="px-4 py-3.5 text-right font-bold text-[hsl(138_72%_25%)]">Repagos</th>
-                    <th className="px-4 py-3.5 text-right font-bold text-[hsl(138_72%_25%)]">Mora CPP</th>
-                    <th className="px-4 py-3.5 text-right font-bold text-[hsl(138_72%_25%)]">Mora Deficiente</th>
-                    <th className="px-4 py-3.5 text-right font-bold text-[hsl(138_72%_25%)]">% Mora 9</th>
-                    <th className="px-4 py-3.5 text-right font-bold text-[hsl(138_72%_25%)]">Crec. Neto 30</th>
+          <div key="vista-normalizacion" className="overflow-x-auto pb-2">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="px-3 pb-2.5 font-semibold text-left">Agencia</th>
+                  <th className="px-3 pb-2.5 font-semibold text-left">Recuperador</th>
+                  <th className="px-3 pb-2.5 font-semibold text-right">Cartera</th>
+                  <th className="px-3 pb-2.5 font-semibold text-right">Repagos</th>
+                  <th className="px-3 pb-2.5 font-semibold text-right">Mora CPP</th>
+                  <th className="px-3 pb-2.5 font-semibold text-right">Mora Deficiente</th>
+                  <th className="px-3 pb-2.5 font-semibold text-right">% Mora 9</th>
+                  <th className="px-3 pb-2.5 font-semibold text-right">Crec. Neto 30</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/50">
+                {datosNormalizacion.map((row: any) => (
+                  <tr key={`${row.agency}-${row.recuperador}`} className="hover:bg-muted/30 transition-colors">
+                    <td className="px-3 py-2.5 font-semibold text-left">{row.agency}</td>
+                    <td className="px-3 py-2.5 text-left text-muted-foreground">{row.recuperador}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{money(row.cartera)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{money(row.repagos)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-rose-600">{money(row.moraCPP_soles)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-rose-600">{money(row.moraDeficiente_soles)}</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-rose-600 font-bold">{Number(row.pctMora9).toFixed(2)}%</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-rose-600 font-bold">{money(row.crecNeto30)}</td>
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {datosNormalizacion.map((row: any) => (
-                    <tr key={`${row.agency}-${row.recuperador}`} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-4 py-3 font-semibold text-left">{row.agency}</td>
-                      <td className="px-4 py-3 text-left text-muted-foreground">{row.recuperador}</td>
-                      <td className="px-4 py-3 text-right">{money(row.cartera)}</td>
-                      <td className="px-4 py-3 text-right">{money(row.repagos)}</td>
-                      <td className="px-4 py-3 text-right text-[hsl(var(--destructive))]">{money(row.moraCPP_soles)}</td>
-                      <td className="px-4 py-3 text-right text-[hsl(var(--destructive))]">{money(row.moraDeficiente_soles)}</td>
-                      <td className="px-4 py-3 text-right bg-[hsl(var(--destructive)/.1)] text-[hsl(var(--destructive))] font-bold">{Number(row.pctMora9).toFixed(2)}%</td>
-                      <td className="px-4 py-3 text-right font-bold text-[hsl(var(--destructive))]">{money(row.crecNeto30)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                <tfoot>
-                  <tr className="border-t-2 border-border font-bold bg-muted/30">
-                    <td className="px-4 py-3 text-left" colSpan={2}>Total Normalización</td>
-                    <td className="px-4 py-3 text-right">{money(totNormCartera)}</td>
-                    <td className="px-4 py-3 text-right">{money(totNormRepagos)}</td>
-                    <td className="px-4 py-3 text-right text-[hsl(var(--destructive))]">{money(totNormMoraCPP)}</td>
-                    <td className="px-4 py-3 text-right text-[hsl(var(--destructive))]">{money(totNormMoraDef)}</td>
-                    <td className="px-4 py-3 text-right text-[hsl(var(--destructive))]">{avgNormPctMora.toFixed(2)}%</td>
-                    <td className="px-4 py-3 text-right text-[hsl(var(--destructive))]">{money(totNormCrecNeto30)}</td>
-                  </tr>
-                </tfoot>
-              </table>
-            </TableShell>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border font-bold bg-muted/20">
+                  <td className="px-3 py-2.5 text-left" colSpan={2}>Total Normalización</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{money(totNormCartera)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{money(totNormRepagos)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-rose-600">{money(totNormMoraCPP)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-rose-600">{money(totNormMoraDef)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-rose-600">{avgNormPctMora.toFixed(2)}%</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-rose-600">{money(totNormCrecNeto30)}</td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         )}
       </Panel>
 
+      {/* SECCIÓN 2: AVANCE DE OPERACIONES Y MONTOS */}
       <SectionBand tone="blue">Avance de Operaciones y Montos</SectionBand>
       <div className="grid gap-5 xl:grid-cols-2">
-        <Panel title="En Cantidad de Colocaciones" eyebrow="Tabla de datos vs Gráfico de avance">
-          <div className="grid gap-5 lg:grid-cols-[1.3fr_1.5fr] items-stretch">
-            <TableShell minWidth="100%">
-              <table className="w-full text-[13px] whitespace-nowrap">
+        
+        {/* GRÁFICO 1: OPERACIONES */}
+        <Panel title="En Cantidad de Colocaciones" eyebrow="Resaltando agencia seleccionada">
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_1.5fr] items-stretch">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs whitespace-nowrap">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40">
-                    <th className="px-3 py-2.5 text-left font-semibold text-muted-foreground">Agencia</th>
-                    <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground">Operac.</th>
-                    <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground">Meta</th>
-                    <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground">Avance</th>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="px-2 pb-2 font-semibold">Agencia</th>
+                    <th className="px-2 pb-2 font-semibold text-right">Oper.</th>
+                    <th className="px-2 pb-2 font-semibold text-right">Meta</th>
+                    <th className="px-2 pb-2 font-semibold text-right">Avance</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/60">
+                <tbody className="divide-y divide-border/50">
                   {datosFiltrados.map((row: any) => (
-                    <tr key={row.agency} className="hover:bg-muted/20">
-                      <td className="px-3 py-2.5 font-semibold text-left">{row.agency}</td>
-                      <td className="px-3 py-2.5 text-right font-mono">{row.opAchieved}</td>
-                      <td className="px-3 py-2.5 text-right bg-[hsl(var(--accent)/.15)]">
-                        <div className="font-bold text-[14px]">{row.opTarget}</div>
-                        {row.opTarget !== row.opTargetBase && row.opTargetBase > 0 && (<div className="text-[11px] text-muted-foreground line-through" title="Meta Base Original">{row.opTargetBase}</div>)}
+                    <tr key={row.agency} className="hover:bg-muted/30">
+                      <td className="px-2 py-2 font-medium">{row.agency}</td>
+                      <td className="px-2 py-2 text-right font-mono">{row.opAchieved}</td>
+                      <td className="px-2 py-2 text-right font-mono text-muted-foreground">{row.opTarget}</td>
+                      <td className="px-2 py-2 text-right font-mono font-bold text-emerald-600">
+                        {row.opTarget > 0 ? Math.round((row.opAchieved / row.opTarget) * 100) : 0}%
                       </td>
-                      <td className="px-3 py-2.5 text-right font-bold text-[hsl(var(--primary))]">{row.opTarget > 0 ? Math.round((row.opAchieved / row.opTarget) * 100) : 0}%</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t-2 border-border font-bold bg-muted/30">
-                    <td className="px-3 py-2.5 text-left">Total</td>
-                    <td className="px-3 py-2.5 text-right font-mono">{totalOpLogradas}</td>
-                    <td className="px-3 py-2.5 text-right text-[14px]">{totalOpMeta}</td>
-                    <td className="px-3 py-2.5 text-right text-[hsl(var(--primary))]">{pctAvanceOperaciones}%</td>
+                  <tr className="border-t-2 border-border font-bold bg-muted/20">
+                    <td className="px-2 py-2">Total</td>
+                    <td className="px-2 py-2 text-right font-mono">{totalOpLogradas}</td>
+                    <td className="px-2 py-2 text-right font-mono">{totalOpMeta}</td>
+                    <td className="px-2 py-2 text-right font-mono text-emerald-600">{pctAvanceOperaciones}%</td>
                   </tr>
                 </tfoot>
               </table>
-            </TableShell>
-            <div className="flex flex-col h-full min-h-[350px]">
-              <div className="flex-1 w-full min-h-0">
+            </div>
+
+            {/* GRÁFICO CON TODAS LAS AGENCIAS (Highlighting) */}
+            <div className="flex flex-col h-full min-h-[300px]">
+              <div className="flex-1 w-full min-h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={datosFiltrados} margin={{ top: 10, right: 0, left: -25, bottom: 45 }}>
-                    <CartesianGrid vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="agency" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" interval={0} />
-                    <YAxis tick={{ fontSize: 10 }} />
+                  <ComposedChart data={todasComercial} margin={{ top: 10, right: 0, left: -25, bottom: 45 }}>
+                    <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
+                    <XAxis dataKey="agency" tick={{ fontSize: 9 }} angle={-45} textAnchor="end" interval={0} />
+                    <YAxis tick={{ fontSize: 9 }} />
                     <Tooltip />
-                    <Bar dataKey="opAchieved" fill="#0284c7" barSize={20} radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="opAchieved" radius={[2, 2, 0, 0]}>
+                      {todasComercial.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={getBarColor(entry.agency, '#0284c7')} />
+                      ))}
+                    </Bar>
                     <Line type="step" dataKey="opTarget" stroke="#ea580c" strokeWidth={2} dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex justify-center pb-2">
-                <HalfGauge value={pctAvanceOperaciones} title="CUMPLIMIENTO MENSUAL (CANT)" color="#15803d" />
+              <div className="flex justify-center pt-2">
+                <HalfGauge value={pctAvanceOperaciones} title="CUMPLIMIENTO (CANT)" color="#16a34a" />
               </div>
             </div>
           </div>
         </Panel>
 
-        <Panel title="En Monto de Colocaciones" eyebrow="Tabla de datos vs Gráfico de avance">
-          <div className="grid gap-5 lg:grid-cols-[1.3fr_1.5fr] items-stretch">
-            <TableShell minWidth="100%">
-              <table className="w-full text-[13px] whitespace-nowrap">
+        {/* GRÁFICO 2: MONTOS */}
+        <Panel title="En Monto de Colocaciones" eyebrow="Resaltando agencia seleccionada">
+          <div className="grid gap-4 lg:grid-cols-[1.1fr_1.5fr] items-stretch">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs whitespace-nowrap">
                 <thead>
-                  <tr className="border-b border-border bg-muted/40">
-                    <th className="px-3 py-2.5 text-left font-semibold text-muted-foreground">Agencia</th>
-                    <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground">Desembolso</th>
-                    <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground">Meta</th>
-                    <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground">Avance</th>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="px-2 pb-2 font-semibold">Agencia</th>
+                    <th className="px-2 pb-2 font-semibold text-right">Desembolso</th>
+                    <th className="px-2 pb-2 font-semibold text-right">Meta</th>
+                    <th className="px-2 pb-2 font-semibold text-right">Avance</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-border/60">
+                <tbody className="divide-y divide-border/50">
                   {datosFiltrados.map((row: any) => (
-                    <tr key={row.agency} className="hover:bg-muted/20">
-                      <td className="px-3 py-2.5 font-semibold text-left">{row.agency}</td>
-                      <td className="px-3 py-2.5 text-right">{money(row.amountAchieved)}</td>
-                      <td className="px-3 py-2.5 text-right bg-[hsl(var(--accent)/.15)]">
-                        <div className="font-bold text-[14px]">{money(row.amountTarget)}</div>
-                        {row.amountTarget !== row.amountTargetBase && row.amountTargetBase > 0 && (<div className="text-[11px] text-muted-foreground line-through" title="Meta Base Original">{money(row.amountTargetBase)}</div>)}
+                    <tr key={row.agency} className="hover:bg-muted/30">
+                      <td className="px-2 py-2 font-medium">{row.agency}</td>
+                      <td className="px-2 py-2 text-right font-mono">{money(row.amountAchieved)}</td>
+                      <td className="px-2 py-2 text-right font-mono text-muted-foreground">{money(row.amountTarget)}</td>
+                      <td className="px-2 py-2 text-right font-mono font-bold text-emerald-600">
+                        {row.amountTarget > 0 ? Math.round((row.amountAchieved / row.amountTarget) * 100) : 0}%
                       </td>
-                      <td className="px-3 py-2.5 text-right font-bold text-[hsl(var(--primary))]">{row.amountTarget > 0 ? Math.round((row.amountAchieved / row.amountTarget) * 100) : 0}%</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t-2 border-border font-bold bg-muted/30">
-                    <td className="px-3 py-2.5 text-left">Total</td>
-                    <td className="px-3 py-2.5 text-right">{money(totalMontoLogrado)}</td>
-                    <td className="px-3 py-2.5 text-right text-[14px]">{money(totalMontoMeta)}</td>
-                    <td className="px-3 py-2.5 text-right text-[hsl(var(--primary))]">{pctAvanceMontos}%</td>
+                  <tr className="border-t-2 border-border font-bold bg-muted/20">
+                    <td className="px-2 py-2">Total</td>
+                    <td className="px-2 py-2 text-right font-mono">{money(totalMontoLogrado)}</td>
+                    <td className="px-2 py-2 text-right font-mono">{money(totalMontoMeta)}</td>
+                    <td className="px-2 py-2 text-right font-mono text-emerald-600">{pctAvanceMontos}%</td>
                   </tr>
                 </tfoot>
               </table>
-            </TableShell>
-            <div className="flex flex-col h-full min-h-[350px]">
-              <div className="flex-1 w-full min-h-0">
+            </div>
+
+            {/* GRÁFICO CON TODAS LAS AGENCIAS (Highlighting) */}
+            <div className="flex flex-col h-full min-h-[300px]">
+              <div className="flex-1 w-full min-h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={datosFiltrados} margin={{ top: 10, right: 0, left: 10, bottom: 45 }}>
-                    <CartesianGrid vertical={false} stroke="#e2e8f0" />
-                    <XAxis dataKey="agency" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" interval={0} />
-                    <YAxis tickFormatter={v => `${v / 1000}k`} tick={{ fontSize: 10 }} />
+                  <ComposedChart data={todasComercial} margin={{ top: 10, right: 0, left: 10, bottom: 45 }}>
+                    <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
+                    <XAxis dataKey="agency" tick={{ fontSize: 9 }} angle={-45} textAnchor="end" interval={0} />
+                    <YAxis tickFormatter={v => `${v / 1000}k`} tick={{ fontSize: 9 }} />
                     <Tooltip formatter={(v: number) => money(v)} />
-                    <Bar dataKey="amountAchieved" fill="#0369a1" barSize={20} radius={[2, 2, 0, 0]} />
+                    <Bar dataKey="amountAchieved" radius={[2, 2, 0, 0]}>
+                      {todasComercial.map((entry: any, index: number) => (
+                        <Cell key={`cell-${index}`} fill={getBarColor(entry.agency, '#0369a1')} />
+                      ))}
+                    </Bar>
                     <Line type="step" dataKey="amountTarget" stroke="#ea580c" strokeWidth={2} dot={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
-              <div className="flex justify-center pb-2">
-                <HalfGauge value={pctAvanceMontos} title="CUMPLIMIENTO MENSUAL (S/)" color="#15803d" />
+              <div className="flex justify-center pt-2">
+                <HalfGauge value={pctAvanceMontos} title="CUMPLIMIENTO (S/)" color="#16a34a" />
               </div>
             </div>
           </div>
         </Panel>
       </div>
 
+      {/* SECCIÓN 3: CALIDAD DE CARTERA Y MORAS */}
       <SectionBand tone="coral">Calidad de Cartera y Moras</SectionBand>
-      <div className="grid gap-5 xl:grid-cols-[1.15fr_1fr] items-stretch">
+      <div className="grid gap-5 xl:grid-cols-[1.1fr_1.3fr] items-stretch">
         <Panel title="Mora CPP - Detalle" eyebrow="Excedentes y variaciones en tabla">
-          <TableShell minWidth="100%">
-            <table className="w-full text-[13px] whitespace-nowrap">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs whitespace-nowrap">
               <thead>
-                <tr className="border-b border-border bg-muted/40">
-                  <th className="px-4 py-3 text-left font-semibold text-muted-foreground">Agencia</th>
-                  <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Mora CPP</th>
-                  <th className="px-4 py-3 text-right font-semibold text-muted-foreground">% Vigente</th>
-                  <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Meta</th>
-                  <th className="px-4 py-3 text-right font-semibold text-muted-foreground">Excedente (S/)</th>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="px-3 pb-2 font-semibold">Agencia</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Mora CPP</th>
+                  <th className="px-3 pb-2 font-semibold text-right">% Vigente</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Meta</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Excedente (S/)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border/60">
+              <tbody className="divide-y divide-border/50">
                 {datosFiltrados.map((row: any) => (
-                  <tr key={row.agency} className="hover:bg-muted/20">
-                    <td className="px-4 py-3 font-semibold text-left">{row.agency}</td>
-                    <td className="px-4 py-3 text-right">{money(row.moraCPP_soles)}</td>
-                    <td className={`px-4 py-3 text-right ${row.cpp > 10 ? 'text-[hsl(var(--destructive))] font-bold' : ''}`}>{Number(row.cpp).toFixed(2)}%</td>
-                    <td className="px-4 py-3 text-right bg-[hsl(var(--accent)/.15)]">{row.meta}%</td>
-                    <td className={`px-4 py-3 text-right font-bold ${row.excedente > 0 ? 'text-[hsl(var(--destructive))]' : 'text-green-600'}`}>
+                  <tr key={row.agency} className="hover:bg-muted/30">
+                    <td className="px-3 py-2.5 font-medium">{row.agency}</td>
+                    <td className="px-3 py-2.5 text-right font-mono">{money(row.moraCPP_soles)}</td>
+                    <td className={`px-3 py-2.5 text-right font-mono ${row.cpp > 10 ? 'text-rose-600 font-bold' : ''}`}>{Number(row.cpp).toFixed(2)}%</td>
+                    <td className="px-3 py-2.5 text-right font-mono text-muted-foreground">{row.meta}%</td>
+                    <td className={`px-3 py-2.5 text-right font-mono font-bold ${row.excedente > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                       {row.excedente > 0 ? '+' : ''}{money(row.excedente)}
                     </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-border font-bold bg-muted/30">
-                  <td className="px-4 py-3 text-left">Total</td>
-                  <td className="px-4 py-3 text-right">{money(totMoraCPP)}</td>
-                  <td className="px-4 py-3 text-right">{avgPctMora.toFixed(2)}%</td>
-                  <td className="px-4 py-3 text-right">10%</td>
-                  <td className={`px-4 py-3 text-right ${totExcedenteMora > 0 ? 'text-[hsl(var(--destructive))]' : 'text-green-600'}`}>
+                <tr className="border-t-2 border-border font-bold bg-muted/20">
+                  <td className="px-3 py-2.5">Total</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{money(totMoraCPP)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{avgPctMora.toFixed(2)}%</td>
+                  <td className="px-3 py-2.5 text-right font-mono">10%</td>
+                  <td className={`px-3 py-2.5 text-right font-mono ${totExcedenteMora > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                     {totExcedenteMora > 0 ? '+' : ''}{money(totExcedenteMora)}
                   </td>
                 </tr>
               </tfoot>
             </table>
-          </TableShell>
+          </div>
         </Panel>
 
+        {/* CURVA DE MORA COMPLETA CON RESALTADO */}
         <Panel title="Curva de Cumplimiento Mora CPP" eyebrow="Ordenado por % de Mora">
-          <div className="w-full h-[620px]">
+          <div className="w-full h-[380px]">
             <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={[...datosFiltrados].sort((a, b) => Number(a.cpp) - Number(b.cpp))} margin={{ top: 20, right: 10, left: -20, bottom: 45 }}>
+              <ComposedChart 
+                data={[...todasComercial].sort((a, b) => Number(a.cpp) - Number(b.cpp))} 
+                margin={{ top: 20, right: 15, left: -15, bottom: 45 }}
+              >
                 <defs>
                   <linearGradient id="colorCpp" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#0284c7" stopOpacity={0.4}/>
                     <stop offset="95%" stopColor="#0284c7" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="4 4" />
-                <XAxis dataKey="agency" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" interval={0} />
-                <YAxis tickFormatter={v => `${v}%`} tick={{ fontSize: 10 }} />
+                <CartesianGrid vertical={false} stroke="#e2e8f0" strokeDasharray="3 3" />
+                <XAxis dataKey="agency" tick={{ fontSize: 9 }} angle={-45} textAnchor="end" interval={0} />
+                <YAxis tickFormatter={v => `${v}%`} tick={{ fontSize: 9 }} />
                 <Tooltip formatter={(v: number) => `${v}%`} />
-                <Legend wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
-                <Line type="monotone" dataKey="meta" name="Meta 10%" stroke="#dc2626" strokeWidth={2} dot={false} strokeDasharray="5 5" />
-                <Area type="monotone" dataKey="cpp" name="% Mora CPP" stroke="#0284c7" strokeWidth={3} fillOpacity={1} fill="url(#colorCpp)" dot={{ r: 4, strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6, fill: '#0284c7' }} />
+                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+                <Line type="monotone" dataKey="meta" name="Meta 10%" stroke="#dc2626" strokeWidth={1.5} dot={false} strokeDasharray="4 4" />
+                <Area 
+                  type="monotone" 
+                  dataKey="cpp" 
+                  name="% Mora CPP" 
+                  stroke="#0284c7" 
+                  strokeWidth={2.5} 
+                  fillOpacity={1} 
+                  fill="url(#colorCpp)" 
+                  dot={(props: any) => {
+                    const isSelected = props.payload.agency === filters.agency;
+                    return (
+                      <circle 
+                        key={props.key}
+                        cx={props.cx} 
+                        cy={props.cy} 
+                        r={isSelected ? 7 : 3.5} 
+                        fill={isSelected ? '#f59e0b' : '#fff'} 
+                        stroke={isSelected ? '#d97706' : '#0284c7'} 
+                        strokeWidth={isSelected ? 3 : 2} 
+                      />
+                    );
+                  }}
+                />
               </ComposedChart>
             </ResponsiveContainer>
           </div>
