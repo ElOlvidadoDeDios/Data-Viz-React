@@ -83,7 +83,7 @@ const dailyRows = [
   // ... (Agrega el resto de los mocks si alguna vez usas esta vista en lugar de Preventiva)
 ];
 
-export function ProductividadDiariaView() {
+export function ProductividadDiaria({ filters }: any) {
   const countData = dailyRows.map((row) => ({ agency: row.agency, value: Math.round((row.achievedCount / row.targetCount) * 100) }));
   const amountData = dailyRows.map((row) => ({ agency: row.agency, value: Math.round((row.achievedAmount / row.targetAmount) * 100) }));
   
