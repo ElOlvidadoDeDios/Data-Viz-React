@@ -63,7 +63,7 @@ function Dashboard() {
     }
   });
 
-  const [filters, setFilters] = useState<Filters>({ period: 'Cargando...', agency: 'Todas', advisor: 'Todos', day: 'Hoy' });
+  const [filters, setFilters] = useState<Filters>({ period: '202608', agency: 'Todas', advisor: 'Todos', day: 'Hoy' });
 
   useEffect(() => {
     if (dbFilters?.periodos?.length > 0 && filters.period === 'Cargando...') {

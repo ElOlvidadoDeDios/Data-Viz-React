@@ -12,8 +12,12 @@ const dbConfig = {
   },
 };
 
-router.get(["/agencia/:periodo", "/api/agencia/:periodo"], async (req: Request, res: Response) => {
-  const { periodo } = req.params;
+router.get(["/agencia", "/api/agencia"], async (req: Request, res: Response) => {
+  const periodo = req.query.periodo as string;
+
+  if (!periodo) {
+    return res.status(400).json({ error: "El periodo es requerido" });
+  }
 
   try {
     const pool = await sql.connect(dbConfig);

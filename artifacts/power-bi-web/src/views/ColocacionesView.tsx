@@ -1,264 +1,268 @@
 import { useQuery } from '@tanstack/react-query';
-import { Filters } from '../utils/constants';
-import { number } from '../utils/formatters';
-import { LoadingState } from '../components/ui/LoadingState';
-import { SectionBand } from '../components/ui/SectionBand';
-import { GaugeChart } from '../components/ui/GaugeChart';
+import { Panel } from '../components/ui/Panel';
 
-export function ColocacionesView({ filters }: { filters: Filters }) {
-  const { data: agenciaBD, isLoading: loadAgencia } = useQuery({
-    queryKey: ['indicadores-agencia', filters.period],
+export function ColocacionesView({ filters }: { filters: any }) {
+  // 1. Obtenemos datos de la agencia (reutilizando tu ruta existente)
+  const { data: agenciaData, isLoading: loadAgencia, isError: errorAgencia } = useQuery({
+    queryKey: ['agencia', filters.period],
     queryFn: async () => {
-      if (!filters.period || filters.period === 'Cargando...') return null;
-      const res = await fetch(`http://localhost:3000/api/agencia/${filters.period}`);
+      const params = new URLSearchParams({ periodo: filters.period !== 'Cargando...' ? filters.period : '' });
+      const res = await fetch(`http://localhost:3000/api/agencia?${params}`);
       if (!res.ok) throw new Error('Error al cargar agencia');
       return res.json();
     },
-    enabled: !!filters.period && filters.period !== 'Cargando...'
+    enabled: filters.period !== 'Cargando...',
   });
 
-  const { data: diasBD, isLoading: loadDias } = useQuery({
-    queryKey: ['dias-laborales', filters.period],
+  // 2. Obtenemos los días laborales de tu ruta de calendario (o usamos fallback)
+  const { data: calData, isLoading: loadCal } = useQuery({
+    queryKey: ['calendario', filters.period],
     queryFn: async () => {
-      if (!filters.period || filters.period === 'Cargando...') return null;
-      const res = await fetch(`http://localhost:3000/api/dias-laborales/${filters.period}`);
-      if (!res.ok) return null;
+      const params = new URLSearchParams({ periodo: filters.period !== 'Cargando...' ? filters.period : '' });
+      const res = await fetch(`http://localhost:3000/api/calendario?${params}`);
+      if (!res.ok) throw new Error('Error al cargar calendario');
       return res.json();
     },
-    enabled: !!filters.period && filters.period !== 'Cargando...'
+    enabled: filters.period !== 'Cargando...',
   });
 
-  if (loadAgencia || loadDias || !agenciaBD) return <LoadingState />;
-
-  const dataDias = Array.isArray(diasBD) ? diasBD[0] : (diasBD || {});
-  const transcurridos = Number(dataDias?.transcurridos || dataDias?.DiasTranscurridos || 14); 
-  const restantes = Number(dataDias?.restantes || dataDias?.DiasRestantes || 11);
-  const totales = transcurridos + restantes;
-
-  // 🚨 LA SOLUCIÓN EXACTA PARA IGUALAR A AVERAGEX DE DAX 🚨
-  const horaPeru = new Date().toLocaleString("en-US", { timeZone: "America/Lima" });
-  const horaActual = new Date(horaPeru).getHours();
-  const diasProductividadDAX = horaActual < 19 ? transcurridos + 1 : transcurridos;
-
-  const filterByAgency = (arr: any[]) => filters.agency === 'Todas' ? arr : arr.filter((r: any) => r.agency === filters.agency);
-  let dataComercial = filterByAgency(agenciaBD?.comercial || []);
-  const dataResumen = filterByAgency(agenciaBD?.resumen || []);
-  
-  if (filters.advisor !== 'Todos') {
-    dataComercial = dataComercial.filter((r: any) => r.asesor === filters.advisor);
+  if (loadAgencia || loadCal) {
+    return <div className="h-96 animate-pulse rounded-xl bg-muted/50"></div>;
   }
 
-  const metaGlobalReferencia = 30; 
-  const prodIdeal = totales > 0 ? (metaGlobalReferencia / totales).toFixed(2) : "0.00";
+  if (errorAgencia) {
+    return <div className="text-destructive font-semibold">Error de conexión. Revisa que el backend esté corriendo.</div>;
+  }
 
-  const dataAsesores = dataComercial.map((row: any) => {
-    const logrado = Number(row.opAchieved || 0);
-    const metaIndividual = Number(row.metaAsesor || 30);
-    
-    const productividad = diasProductividadDAX > 0 ? (logrado / diasProductividadDAX) : 0;
-    const proyeccion = logrado + Math.round(productividad * restantes);
-    
-    const faltante = Math.max(0, metaIndividual - logrado);
-    const faltanteExigente = restantes > 0 ? (faltante / restantes).toFixed(2) : '0.00';
+  // --- DÍAS LABORALES ---
+  const dTotales = calData?.totales || 25;
+  const dTranscurridos = calData?.transcurridos || 16;
+  const dRestantes = dTotales - dTranscurridos;
 
-    const pctCumplimiento = metaIndividual > 0 ? (proyeccion / metaIndividual) * 100 : 0;
+  // --- LÓGICA COMERCIAL Y FILTROS LOCALES ---
+  let comercial = agenciaData?.comercial || [];
+  if (filters.agency !== 'Todas') {
+    comercial = comercial.filter((c: any) => c.agency === filters.agency);
+  }
+  if (filters.advisor !== 'Todos') {
+    comercial = comercial.filter((c: any) => c.asesor === filters.advisor);
+  }
 
-    let clasificacion = ""; let colorClass = "";
-    if (pctCumplimiento >= 120) { clasificacion = "Muy Autosuficiente"; colorClass = "bg-[#43a047]/90 text-white"; }
-    else if (pctCumplimiento >= 110) { clasificacion = "Autosuficiente"; colorClass = "bg-[#81c784]/90 text-black"; }
-    else if (pctCumplimiento >= 100) { clasificacion = "Necesita Mantenerse Así"; colorClass = "bg-[#c8e6c9]/90 text-black"; }
-    else if (pctCumplimiento >= 90) { clasificacion = "Necesita Motivación"; colorClass = "bg-[#fff59d]/90 text-black"; }
-    else if (pctCumplimiento >= 80) { clasificacion = "Necesita Exigencia"; colorClass = "bg-[#ffb74d]/90 text-black"; }
-    else { clasificacion = "Necesita Llamada De Atención"; colorClass = "bg-[#e53935]/90 text-white"; }
-
-    return { 
-      asesor: row.asesor, 
-      logrado, 
-      productividad: productividad.toFixed(2), 
-      proyeccion, 
-      faltante, 
-      faltanteExigente, 
-      clasificacion, 
-      colorClass, 
-      metaAsesor: metaIndividual 
-    };
-  }).sort((a, b) => b.logrado - a.logrado);
-
-  const sum = (arr: any[], key: string) => arr.reduce((acc, row) => acc + Number(row[key] || 0), 0);
+  // Cálculos agregados a nivel de Agencia
+  const logrado = comercial.reduce((acc: number, curr: any) => acc + Number(curr.opAchieved || 0), 0);
+  const meta = comercial.reduce((acc: number, curr: any) => acc + Number(curr.metaAsesor || 30), 0);
   
-  const logradoAgencia = sum(dataComercial, 'opAchieved');
-  const metaAgencia = sum(dataResumen, 'opTarget');
-  const faltanteAgencia = Math.max(0, metaAgencia - logradoAgencia);
-  const pctLogrado = metaAgencia > 0 ? (logradoAgencia / metaAgencia) * 100 : 0;
+  const faltante = Math.max(0, meta - logrado);
+  const cumplimiento = meta > 0 ? (logrado / meta) * 100 : 0;
 
-  const proyeccionAgencia = sum(dataAsesores, 'proyeccion');
-  const faltanteProyectado = Math.max(0, metaAgencia - proyeccionAgencia);
-  const pctProyeccion = metaAgencia > 0 ? (proyeccionAgencia / metaAgencia) * 100 : 0;
+  const proyeccion = dTranscurridos > 0 ? Math.round((logrado / dTranscurridos) * dTotales) : 0;
+  const proyFaltante = Math.max(0, meta - proyeccion);
+  const proyCumplimiento = meta > 0 ? (proyeccion / meta) * 100 : 0;
 
-  const ritmoHastaFecha = transcurridos > 0 ? Math.round(logradoAgencia / transcurridos) : 0;
-  const ritmoDesdeHoy = restantes > 0 ? Math.round(faltanteAgencia / restantes) : 0;
-  const ritmoReferencia = totales > 0 ? Math.round(metaAgencia / totales) : 0;
+  // Días Laborales KPIs
+  const credPorDiaHastaFecha = dTranscurridos > 0 ? Math.round(logrado / dTranscurridos) : 0;
+  const credPorDiaRestantes = dRestantes > 0 ? Math.round(faltante / dRestantes) : 0;
+  const credPorDiaReferencia = dTotales > 0 ? Math.round(meta / dTotales) : 0;
+  const prodIdeal = dTotales > 0 ? (30 / dTotales).toFixed(2) : '1.20';
 
-  const maxProyeccion = Math.max(...dataAsesores.map(a => Math.max(a.proyeccion, a.metaAsesor)), 1);
+  // Armar la tabla de asesores calculando su categoría de color
+  const tableData = comercial.map((c: any) => {
+    const log = Number(c.opAchieved || 0);
+    const met = Number(c.metaAsesor || 30);
+    const prod = dTranscurridos > 0 ? (log / dTranscurridos) : 0;
+    const proy = Math.round(prod * dTotales);
+    const falt = Math.max(0, met - log);
+    const faltDia = dRestantes > 0 ? (falt / dRestantes) : 0;
+    const faltExigente = Math.ceil(faltDia);
+    
+    const pct = met > 0 ? (proy / met) * 100 : 0;
+    let bgClass = "bg-rose-500/20"; 
+    if (pct >= 120) bgClass = "bg-emerald-500/40";
+    else if (pct >= 110) bgClass = "bg-emerald-400/20";
+    else if (pct >= 100) bgClass = "bg-lime-400/20";
+    else if (pct >= 90) bgClass = "bg-amber-300/20";
+    else if (pct >= 80) bgClass = "bg-orange-400/20";
+
+    return { asesor: c.asesor, log, prod, proy, faltDia, faltExigente, bgClass };
+  }).sort((a: any, b: any) => a.log - b.log); // Ordenamos de menor a mayor como en PBI
+
+  // Componente de Semi Donut SVG (recreación del Gauge de PBI)
+  const SemiDonut = ({ pct }: { pct: number }) => {
+    const radius = 70;
+    const circum = Math.PI * radius;
+    const dashoffset = circum - (Math.min(100, pct) / 100) * circum;
+    return (
+      <div className="relative flex flex-col items-center pt-2">
+        <svg width="180" height="100" viewBox="0 0 180 100" className="overflow-visible">
+          <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="#f1f5f9" strokeWidth="20" strokeLinecap="butt" />
+          <path d="M 20 90 A 70 70 0 0 1 160 90" fill="none" stroke="#16a34a" strokeWidth="20" strokeLinecap="butt" 
+                strokeDasharray={circum} strokeDashoffset={dashoffset} className="transition-all duration-1000 ease-out" />
+        </svg>
+        <div className="absolute bottom-2 text-4xl font-display font-bold text-foreground">{Math.round(pct)}%</div>
+        <div className="absolute bottom-0 left-0 text-[11px] font-bold text-rose-600">0%</div>
+        <div className="absolute bottom-0 right-0 text-[11px] font-bold text-rose-600">100%</div>
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200" key={`${filters.period}-${filters.agency}-${filters.advisor}`}>
+    <div className="space-y-6 animate-in fade-in duration-500">
       
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight text-foreground">El objetivo del mes se vuelve alcanzable.</h2>
-        <p className="text-muted-foreground mt-1 text-[13px]">Monitorea meta, logro y proyección para anticiparte al cierre de la agencia.</p>
+      {/* ======================= 1. DÍAS LABORALES ======================= */}
+      <Panel title="En este mes tenemos:">
+        <div className="grid grid-cols-3 text-center divide-x divide-border/50 py-4">
+          <div>
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase mb-2">Días Laborales Totales</div>
+            <div className="text-4xl font-display text-foreground">{dTotales}</div>
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase mb-2">Días Laborales Transcurridos</div>
+            <div className="text-4xl font-display text-[#1d4ed8]">{dTranscurridos}</div>
+          </div>
+          <div>
+            <div className="text-[11px] font-semibold text-muted-foreground uppercase mb-2">Días Laborales Restantes</div>
+            <div className="text-4xl font-display text-rose-600">{dRestantes}</div>
+          </div>
+        </div>
+        <div className="h-3 w-full flex overflow-hidden">
+          <div className="bg-[#3b82f6]" style={{ width: `${(dTranscurridos/dTotales)*100}%` }}></div>
+          <div className="bg-[#1e3a8a] flex-1"></div>
+        </div>
+      </Panel>
+
+      {/* ======================= 2. NIVEL DE AGENCIA ======================= */}
+      <div className="rounded-md bg-amber-600/20 px-4 py-2 text-center font-display font-bold uppercase tracking-widest text-amber-800 mt-8">
+        A NIVEL DE AGENCIA
       </div>
 
-      <SectionBand tone="coral">A NIVEL DE AGENCIA</SectionBand>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Panel title="" headerClass="hidden">
+          <div className="bg-[#16a34a] text-white text-center py-2 font-bold rounded-t-xl text-sm">Hasta Hoy, ¿Cómo Va mi Agencia?</div>
+          <div className="flex flex-col items-center p-6">
+            <div className="text-[10px] text-muted-foreground font-semibold mb-4">Cumplimiento Porcentual de la Meta Mensual</div>
+            <SemiDonut pct={cumplimiento} />
+            <div className="grid grid-cols-3 w-full text-center mt-6">
+              <div>
+                <div className="text-[10px] font-semibold text-foreground">Logrado a la Fecha</div>
+                <div className="text-3xl font-display text-[#16a34a]">{logrado}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold text-foreground">Faltante a la Meta</div>
+                <div className="text-3xl font-display text-rose-500">{faltante}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold text-foreground">Meta</div>
+                <div className="text-3xl font-display text-foreground">{meta}</div>
+              </div>
+            </div>
+          </div>
+        </Panel>
+
+        <Panel title="" headerClass="hidden">
+          <div className="bg-[#16a34a] text-white text-center py-2 font-bold rounded-t-xl text-sm">Al cierre de Mes, ¿Cómo Iría mi Agencia?</div>
+          <div className="flex flex-col items-center p-6">
+            <div className="text-[10px] text-muted-foreground font-semibold mb-4">Proyección del Cumplimiento Porcentual</div>
+            <SemiDonut pct={proyCumplimiento} />
+            <div className="grid grid-cols-3 w-full text-center mt-6">
+              <div>
+                <div className="text-[10px] font-semibold text-foreground">Logrado a la Fecha</div>
+                <div className="text-3xl font-display text-[#16a34a]">{proyeccion}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold text-foreground">Faltante a la Meta</div>
+                <div className="text-3xl font-display text-rose-500">{proyFaltante}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-semibold text-foreground">Meta</div>
+                <div className="text-3xl font-display text-foreground">{meta}</div>
+              </div>
+            </div>
+          </div>
+        </Panel>
+      </div>
+
+      <div className="text-center font-bold pt-4">En términos de días laborales:</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="text-center px-4">
+          <div className="text-xs text-foreground mb-3 h-10">Hasta la fecha, es como si hubiese colocado ... créditos por día laboral</div>
+          <div className="text-5xl font-display text-[#16a34a]">{credPorDiaHastaFecha}</div>
+        </div>
+        <div className="text-center px-4">
+          <div className="text-xs text-foreground mb-3 h-10">Cada uno de estos días restantes, tengo que colocar ... créditos para llegar a mi meta</div>
+          <div className="text-5xl font-display text-rose-500 relative inline-block">
+            {credPorDiaRestantes}
+            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold text-foreground border-2 border-foreground px-2 py-1 rounded bg-background">Mi meta de hoy</div>
+          </div>
+        </div>
+        <div className="text-center px-4">
+          <div className="text-xs text-foreground mb-3 h-10">Como referencia, si durante el mes coloco ... créditos por día laboral llego a mi meta</div>
+          <div className="text-5xl font-display text-foreground">{credPorDiaReferencia}</div>
+        </div>
+      </div>
+
+      {/* ======================= 3. NIVEL DE ASESORES ======================= */}
+      <div className="rounded-md bg-amber-600/20 px-4 py-2 text-center font-display font-bold uppercase tracking-widest text-amber-800 mt-12">
+        A NIVEL DE ASESORES
+      </div>
       
-      <div className="grid gap-6 xl:grid-cols-2">
-        <div className="bg-card rounded-xl border border-border shadow-sm p-6 flex flex-col items-center text-center">
-          <h3 className="font-bold text-xl text-foreground mb-1">Hasta Hoy, ¿Cómo Va mi Agencia?</h3>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-8">Cumplimiento de la Meta Mensual</p>
-          <GaugeChart pct={pctLogrado} color="#159a43" />
-          <div className="grid grid-cols-3 gap-4 w-full mt-10 divide-x divide-border/60">
-             <div>
-               <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Logrado</div>
-               <div className="text-3xl font-light text-[hsl(142_71%_35%)]">{number(logradoAgencia)}</div>
-             </div>
-             <div>
-               <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Faltante</div>
-               <div className="text-3xl font-light text-[hsl(348_83%_55%)]">{number(faltanteAgencia)}</div>
-             </div>
-             <div>
-               <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Meta</div>
-               <div className="text-3xl font-light text-foreground">{number(metaAgencia)}</div>
-             </div>
-          </div>
-        </div>
-
-        <div className="bg-card rounded-xl border border-border shadow-sm p-6 flex flex-col items-center text-center">
-          <h3 className="font-bold text-xl text-foreground mb-1">Al cierre de Mes, ¿Cómo Iría mi Agencia?</h3>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-8">Proyección de la Meta Mensual</p>
-          <GaugeChart pct={pctProyeccion} color="#159a43" />
-          <div className="grid grid-cols-3 gap-4 w-full mt-10 divide-x divide-border/60">
-             <div>
-               <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Proyección</div>
-               <div className="text-3xl font-light text-[hsl(142_71%_35%)]">{number(proyeccionAgencia)}</div>
-             </div>
-             <div>
-               <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Faltante</div>
-               <div className="text-3xl font-light text-[hsl(348_83%_55%)]">{number(faltanteProyectado)}</div>
-             </div>
-             <div>
-               <div className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Meta</div>
-               <div className="text-3xl font-light text-foreground">{number(metaAgencia)}</div>
-             </div>
-          </div>
-        </div>
+      <div className="bg-[#16a34a] text-white font-bold text-center py-1.5 rounded-md text-sm shadow-sm">
+        ¿Qué tan Productivos son mis Asesores?
+      </div>
+      
+      <div className="text-[13px] px-2 mt-4 leading-relaxed text-foreground">
+        <p><strong>¿Productivos?</strong> Es decir, cuántos créditos colocan por día.</p>
+        <p className="mt-2 text-base">Este mes, ¿cuál es la <span className="underline italic font-bold">productividad ideal</span> que debe tener mi asesor? <strong className="text-2xl">{prodIdeal}</strong> créditos por día laboral.</p>
+        <p className="mt-2 text-base"><strong>¿Por qué?</strong> En este mes, si un asesor coloca <strong className="text-2xl">{prodIdeal}</strong> créditos por día, entonces en <strong className="text-2xl">{dTotales}</strong> días laborales llegará a su meta de <strong className="text-2xl">30</strong> créditos.</p>
       </div>
 
-      <div className="bg-card rounded-xl border border-border shadow-sm p-6 sm:p-8 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-muted/20 pointer-events-none"></div>
-        <h3 className="text-center font-bold text-xl text-foreground mb-8 relative z-10">En términos de días laborales:</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center max-w-5xl mx-auto relative z-10 divide-y md:divide-y-0 md:divide-x divide-border/60">
-          <div className="flex flex-col items-center px-4 pt-4 md:pt-0">
-            <div className="text-5xl font-light text-[hsl(142_71%_35%)] mb-3">{ritmoHastaFecha}</div>
-            <p className="text-xs text-muted-foreground max-w-[200px] leading-relaxed">
-              Hasta la fecha, es como si hubiese colocado ... créditos por día laboral
-            </p>
-          </div>
-          <div className="flex flex-col items-center px-4 pt-4 md:pt-0">
-            <div className="text-5xl font-bold text-[hsl(348_83%_55%)] mb-2">{ritmoDesdeHoy}</div>
-            <span className="mb-3 inline-flex items-center rounded-full bg-red-100 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-red-700 ring-1 ring-inset ring-red-600/20 dark:bg-red-900/30 dark:text-red-400">
-              Mi meta de hoy
-            </span>
-            <p className="text-xs text-muted-foreground max-w-[220px] leading-relaxed">
-              Cada uno de estos días restantes, tengo que colocar ... créditos para llegar a mi meta
-            </p>
-          </div>
-          <div className="flex flex-col items-center px-4 pt-4 md:pt-0">
-            <div className="text-5xl font-light text-foreground/80 mb-3">{ritmoReferencia}</div>
-            <p className="text-xs text-muted-foreground max-w-[220px] leading-relaxed">
-              Como referencia, si durante el mes coloco ... créditos por día laboral llego a mi meta
-            </p>
-          </div>
-        </div>
+      <div className="overflow-x-auto border border-foreground rounded mt-6">
+        <table className="w-full text-center text-[11px] whitespace-nowrap">
+          <thead>
+            <tr className="bg-muted">
+              <th className="py-2 border-r border-foreground font-bold">Categoría</th>
+              <th className="py-2 border-r border-foreground font-bold">Colocaciones Proyectadas</th>
+              <th className="py-2 border-r border-foreground font-bold">Rango Productividad</th>
+              <th className="py-2 font-bold">Rango de Cumplimiento %</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="bg-emerald-600 text-white"><td className="py-1 border-r border-foreground text-left px-2 font-semibold">Muy Autosuficiente</td><td className="border-r border-foreground">&gt;= 36</td><td className="border-r border-foreground">&gt;= 1.50</td><td>&gt;= 120%</td></tr>
+            <tr className="bg-emerald-400/80"><td className="py-1 border-r border-foreground text-left px-2 font-semibold">Autosuficiente</td><td className="border-r border-foreground">33 a 35</td><td className="border-r border-foreground">[1.38 - 1.50)</td><td>110% - 120%</td></tr>
+            <tr className="bg-lime-400/80"><td className="py-1 border-r border-foreground text-left px-2 font-semibold">Necesita Mantenerse Así</td><td className="border-r border-foreground">30 a 32</td><td className="border-r border-foreground">[1.25 - 1.38)</td><td>100% - 110%</td></tr>
+            <tr className="bg-amber-300/80"><td className="py-1 border-r border-foreground text-left px-2 font-semibold">Necesita Motivación</td><td className="border-r border-foreground">27 a 29</td><td className="border-r border-foreground">[1.12 - 1.25)</td><td>90% - 100%</td></tr>
+            <tr className="bg-orange-400/80"><td className="py-1 border-r border-foreground text-left px-2 font-semibold">Necesita Exigencia</td><td className="border-r border-foreground">24 a 26</td><td className="border-r border-foreground">[1.00 - 1.12)</td><td>80% - 90%</td></tr>
+            <tr className="bg-rose-500 text-white"><td className="py-1 border-r border-foreground text-left px-2 font-semibold">Necesita Llamada de Atención</td><td className="border-r border-foreground">&lt;= 23</td><td className="border-r border-foreground">&lt; 1.00</td><td>&lt;= 80%</td></tr>
+          </tbody>
+        </table>
       </div>
 
-      <SectionBand tone="green">A NIVEL DE ASESORES</SectionBand>
-
-      <div className="bg-card rounded-xl border border-border shadow-[var(--shadow-soft)] p-6">
-        <h3 className="font-bold text-lg text-foreground mb-1">¿Qué tan productivos son mis asesores?</h3>
-        <p className="text-[10px] text-muted-foreground uppercase tracking-widest font-semibold mb-6">Productividad Ideal · Colocaciones por Día</p>
-        
-        <div className="flex gap-4 mb-8">
-           <div className="bg-muted/30 p-3 px-5 rounded-xl border border-border/50">
-              <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Productividad Ideal</div>
-              <div className="text-2xl font-bold">{prodIdeal}</div>
-            </div>
-            <div className="bg-muted/30 p-3 px-5 rounded-xl border border-border/50">
-              <div className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider mb-0.5">Créditos por día laboral</div>
-              <div className="text-2xl font-bold">{prodIdeal}</div>
-            </div>
-        </div>
-
-        <div className="grid gap-8 xl:grid-cols-2 items-start">
-          <div className="border border-border rounded-lg overflow-hidden">
-            <div className="max-h-[500px] overflow-y-auto mobile-scroll">
-              <table className="w-full text-[13px] whitespace-nowrap">
-                <thead className="sticky top-0 bg-card shadow-sm z-10">
-                  <tr className="border-b border-border bg-muted/20">
-                    <th className="px-3 py-3 text-left font-bold">Asesor</th>
-                    <th className="px-3 py-3 text-right font-bold">Logrado</th>
-                    <th className="px-3 py-3 text-right font-bold">Productividad</th>
-                    <th className="px-3 py-3 text-right font-bold">Proyección</th>
-                    <th className="px-3 py-3 text-right font-bold">Faltante por<br/>Día Restante</th>
-                    <th className="px-3 py-3 text-right font-bold">Faltante Exigente<br/>por Día Restante</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/60">
-                  {dataAsesores.map((a: any) => (
-                    <tr key={a.asesor} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-3 py-2.5 text-left font-semibold">{a.asesor}</td>
-                      <td className="px-3 py-2.5 text-right font-mono">{a.logrado}</td>
-                      <td className="px-3 py-2.5 text-right font-mono">{a.productividad}</td>
-                      <td className="px-3 py-2.5 text-right font-mono">{a.proyeccion}</td>
-                      <td className="px-3 py-2.5 text-right font-mono">{a.faltanteExigente}</td>
-                      <td className="px-3 py-2.5 text-right font-mono text-[hsl(35_80%_40%)] font-bold">{Math.ceil(Number(a.faltanteExigente))}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="border border-border rounded-lg p-4 bg-muted/5">
-            <h4 className="font-bold text-sm mb-4">Cumplimiento de la Meta por Analista</h4>
-            <div className="space-y-4 max-h-[440px] overflow-y-auto mobile-scroll pr-8">
-              {dataAsesores.map((a: any) => (
-                <div key={`bar-${a.asesor}`} className="grid grid-cols-[120px_1fr] items-center gap-4">
-                  <div className="text-[11px] font-semibold text-right truncate cursor-default" title={a.asesor}>{a.asesor}</div>
-                  <div className="relative h-5 w-full bg-muted rounded-r-md">
-                    <div 
-                      className="absolute top-0 left-0 h-full bg-border rounded-r-md transition-all duration-700" 
-                      style={{ width: `${(a.proyeccion / maxProyeccion) * 100}%` }}
-                    >
-                       <span className="absolute -right-5 top-0.5 text-[10px] font-bold text-muted-foreground">{a.proyeccion}</span>
-                    </div>
-                    <div 
-                      className="absolute top-0 left-0 h-full bg-[hsl(202_76%_41%)] rounded-r-md transition-all duration-700 z-10" 
-                      style={{ width: `${(a.logrado / maxProyeccion) * 100}%` }}
-                    >
-                      <span className="absolute -right-4 top-0.5 text-[10px] font-bold text-[hsl(202_76%_25%)] drop-shadow-[0_1px_1px_rgba(255,255,255,0.8)]">{a.logrado}</span>
-                    </div>
-                    <div 
-                      className="absolute top-[-4px] bottom-[-4px] border-l-2 border-red-500 z-20"
-                      style={{ left: `${(a.metaAsesor / maxProyeccion) * 100}%` }}
-                      title={`Meta: ${a.metaAsesor}`}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-        </div>
+      <div className="overflow-x-auto mt-4 max-h-[400px] rounded border border-border">
+        <table className="w-full text-center text-[11px] whitespace-nowrap">
+          <thead className="sticky top-0 bg-background shadow-sm">
+            <tr className="border-b border-border text-foreground">
+              <th className="px-3 py-2 font-bold text-left">Asesor</th>
+              <th className="px-3 py-2 font-bold">Logrado</th>
+              <th className="px-3 py-2 font-bold">Productividad</th>
+              <th className="px-3 py-2 font-bold">Proyeccion</th>
+              <th className="px-3 py-2 font-bold">Faltante por Día Restante</th>
+              <th className="px-3 py-2 font-bold">Faltante Exigente por Día Restante</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border/50">
+            {tableData.length > 0 ? tableData.map((c: any, i: number) => (
+              <tr key={i} className={`${c.bgClass} hover:opacity-80 transition-opacity`}>
+                <td className="px-3 py-1.5 font-semibold text-left">{c.asesor}</td>
+                <td className="px-3 py-1.5">{c.log}</td>
+                <td className="px-3 py-1.5">{c.prod.toFixed(2)}</td>
+                <td className="px-3 py-1.5">{c.proy}</td>
+                <td className="px-3 py-1.5">{c.faltDia.toFixed(2)}</td>
+                <td className="px-3 py-1.5">{c.faltExigente}</td>
+              </tr>
+            )) : (
+              <tr><td colSpan={6} className="py-4 italic text-muted-foreground">No hay datos para esta selección</td></tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
     </div>
