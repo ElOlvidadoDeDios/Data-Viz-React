@@ -6,6 +6,7 @@ import { SectionBand } from '../components/ui/SectionBand';
 import { Panel } from '../components/ui/Panel';
 import { TableShell } from '../components/ui/TableShell';
 import { StatusCell } from '../components/ui/StatusCell';
+import { WorkdayStrip } from '../components/WorkdayStrip';
 
 export function SupervisionAgenciasView({ navigate, filters }: { navigate: (view: View) => void; filters: Filters }) {
   const { data: supervisionBD, isLoading, error } = useQuery({
@@ -85,6 +86,8 @@ export function SupervisionAgenciasView({ navigate, filters }: { navigate: (view
 
   return (
     <div className="space-y-6" key={`${filters.period}-${filters.agency}`}>
+      {/* COMPONENTE DE DÍAS LABORALES */}
+      <WorkdayStrip periodo={filters.period} />
       {/* 1. AGENCIA COMPLETA */}
       <SectionBand tone="blue">Agencia Completa: Comercial + Recuperadores</SectionBand>
       <Panel title="Indicadores por agencia" eyebrow="Crecimiento Neto 150 · Cartera y Mora" action={<button onClick={() => navigate('agencia')} className="text-xs font-semibold text-[hsl(var(--primary))] hover:underline">Abrir detalle →</button>}>

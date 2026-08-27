@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
 import { Building2, Users, ShieldAlert } from 'lucide-react';
 import { Panel } from '../components/ui/Panel';
+import { WorkdayStrip } from '../components/WorkdayStrip';
 
 export function AgenciaView({ filters }: { filters: any }) {
   const { data, isLoading, isError } = useQuery({
-    // Solo recargamos de la BD si cambia el PERIODO. Agencia y Asesor se filtran localmente.
     queryKey: ['agencia', filters.period], 
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -65,32 +65,41 @@ export function AgenciaView({ filters }: { filters: any }) {
     moraDefMax: 0, moraDefActual: 0
   });
 
-  // Promedio de TEA
+  // Promedios y porcentajes para tabla comercial
   if (comercialFiltered.length > 0) {
     totales.tea = totales.tea / comercialFiltered.length;
   }
+  const t_plazoComercial = comercialFiltered.length > 0 ? comercialFiltered.reduce((acc: number, curr: any) => acc + Number(curr.plazo || 0), 0) / comercialFiltered.length : 0;
+  const t_pctMoraCppComercial = totales.cartera > 0 ? (totales.moraCppActual / totales.cartera) * 100 : 0;
 
   // --- 3. CÁLCULO DE TOTALES (Suma de Recuperadores para Agencia Completa) ---
   const totalesRec = recuperacionFiltered.reduce((acc: any, curr: any) => ({
     crecimientoNeto150: acc.crecimientoNeto150 + Number(curr.crecimientoNeto150 || 0),
     repagos: acc.repagos + Number(curr.repagos || 0),
+    carteraInicio: acc.carteraInicio + Number(curr.carteraInicio || 0),
     moraCppMax: acc.moraCppMax + Number(curr.moraCppMax || 0),
     moraCppActual: acc.moraCppActual + Number(curr.moraCppActual || 0),
     moraDefMax: acc.moraDefMax + Number(curr.moraDefMax || 0),
     moraDefActual: acc.moraDefActual + Number(curr.moraDefActual || 0),
-  }), { crecimientoNeto150: 0, repagos: 0, moraCppMax: 0, moraCppActual: 0, moraDefMax: 0, moraDefActual: 0 });
+  }), { crecimientoNeto150: 0, repagos: 0, carteraInicio: 0, moraCppMax: 0, moraCppActual: 0, moraDefMax: 0, moraDefActual: 0 });
 
-  // Sumar recuperación a los totales de agencia
-  totales.crecimientoNeto150 += totalesRec.crecimientoNeto150;
-  totales.repagos += totalesRec.repagos;
-  totales.moraCppMax += totalesRec.moraCppMax;
-  totales.moraCppActual += totalesRec.moraCppActual;
-  totales.moraDefMax += totalesRec.moraDefMax;
-  totales.moraDefActual += totalesRec.moraDefActual;
+  // Sumar recuperación a los totales de agencia completa
+  const totAgenciaCompletaCrecNeto = totales.crecimientoNeto150 + totalesRec.crecimientoNeto150;
+  const totAgenciaCompletaRepagos = totales.repagos + totalesRec.repagos;
+  const totAgenciaCompletaMoraCppMax = totales.moraCppMax + totalesRec.moraCppMax;
+  const totAgenciaCompletaMoraCppActual = totales.moraCppActual + totalesRec.moraCppActual;
+  const totAgenciaCompletaMoraDefMax = totales.moraDefMax + totalesRec.moraDefMax;
+  const totAgenciaCompletaMoraDefActual = totales.moraDefActual + totalesRec.moraDefActual;
+
+  // Dinámica de altura: si es "Todas", limitamos la altura con scroll; si es una agencia, se expande a su tamaño real
+  const containerHeightClass = filters.agency === 'Todas' ? 'max-h-[420px] overflow-y-auto' : '';
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500" key={`${filters.period}-${filters.agency}`}>
       
+      {/* FRANJA DE DÍAS LABORALES COMPACTA */}
+      <WorkdayStrip periodo={filters.period} />
+
       {/* =========================================
           TABLA 1: AGENCIA COMPLETA
       ========================================= */}
@@ -117,18 +126,18 @@ export function AgenciaView({ filters }: { filters: any }) {
             <tbody className="divide-y divide-border/50">
               <tr className="hover:bg-muted/30">
                 <td className="px-3 py-3 font-bold">{filters.agency === 'Todas' ? 'TODA LA RED' : filters.agency}</td>
-                <td className={`px-3 py-3 text-right font-mono ${totales.crecimientoNeto150 >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{fmtMoney(totales.crecimientoNeto150)}</td>
+                <td className={`px-3 py-3 text-right font-mono ${totAgenciaCompletaCrecNeto >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{fmtMoney(totAgenciaCompletaCrecNeto)}</td>
                 <td className="px-3 py-3 text-right font-mono">{fmtMoney(totales.amountAchieved)}</td>
-                <td className="px-3 py-3 text-right font-mono">{fmtMoney(totales.repagos)}</td>
+                <td className="px-3 py-3 text-right font-mono">{fmtMoney(totAgenciaCompletaRepagos)}</td>
                 <td className="px-3 py-3 text-right font-mono">{fmtDec(totales.tea)}</td>
                 <td className="px-3 py-3 text-right font-mono">{fmtNum(totales.opAchieved)}</td>
                 <td className="px-3 py-3 text-right font-mono bg-amber-500/20">{fmtNum(totales.sociosInicio)}</td>
                 <td className={`px-3 py-3 text-right font-mono ${totales.sociosActual < totales.sociosInicio ? 'text-rose-600' : 'text-emerald-600'}`}>{fmtNum(totales.sociosActual)}</td>
                 <td className="px-3 py-3 text-right font-mono">{fmtMoney(totales.cartera)}</td>
-                <td className="px-3 py-3 text-right font-mono bg-amber-500/10">{fmtMoney(totales.moraCppMax)}</td>
-                <td className={`px-3 py-3 text-right font-mono bg-amber-500/10 ${totales.moraCppActual > totales.moraCppMax ? 'text-rose-600 font-bold' : 'text-emerald-600'}`}>{fmtMoney(totales.moraCppActual)}</td>
-                <td className="px-3 py-3 text-right font-mono bg-rose-500/10">{fmtMoney(totales.moraDefMax)}</td>
-                <td className={`px-3 py-3 text-right font-mono bg-rose-500/10 ${totales.moraDefActual > totales.moraDefMax ? 'text-rose-600 font-bold' : 'text-emerald-600'}`}>{fmtMoney(totales.moraDefActual)}</td>
+                <td className="px-3 py-3 text-right font-mono bg-amber-500/10">{fmtMoney(totAgenciaCompletaMoraCppMax)}</td>
+                <td className={`px-3 py-3 text-right font-mono bg-amber-500/10 ${totAgenciaCompletaMoraCppActual > totAgenciaCompletaMoraCppMax ? 'text-rose-600 font-bold' : 'text-emerald-600'}`}>{fmtMoney(totAgenciaCompletaMoraCppActual)}</td>
+                <td className="px-3 py-3 text-right font-mono bg-rose-500/10">{fmtMoney(totAgenciaCompletaMoraDefMax)}</td>
+                <td className={`px-3 py-3 text-right font-mono bg-rose-500/10 ${totAgenciaCompletaMoraDefActual > totAgenciaCompletaMoraDefMax ? 'text-rose-600 font-bold' : 'text-emerald-600'}`}>{fmtMoney(totAgenciaCompletaMoraDefActual)}</td>
               </tr>
             </tbody>
           </table>
@@ -139,10 +148,10 @@ export function AgenciaView({ filters }: { filters: any }) {
           TABLA 2: PARTE COMERCIAL
       ========================================= */}
       <Panel title="Agencia - Parte Comercial" subtitle="Desempeño individual por Asesor" icon={Users}>
-        <div className="overflow-x-auto pb-4">
+        <div className={`overflow-x-auto pb-4 ${containerHeightClass}`}>
           <table className="w-full text-left text-[11px] whitespace-nowrap">
             <thead>
-              <tr className="border-b border-border text-muted-foreground">
+              <tr className="border-b border-border text-muted-foreground sticky top-0 bg-card z-10">
                 <th className="px-3 pb-2 font-semibold">Asesor</th>
                 <th className="px-3 pb-2 font-semibold text-right">Crec. Neto 150</th>
                 <th className="px-3 pb-2 font-semibold text-right">Colocación</th>
@@ -183,6 +192,25 @@ export function AgenciaView({ filters }: { filters: any }) {
                 <tr><td colSpan={15} className="px-3 py-4 text-center text-muted-foreground italic">No hay asesores comerciales para estos filtros.</td></tr>
               )}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border font-bold bg-muted/20">
+                <td className="px-3 py-2.5">Total Comercial</td>
+                <td className={`px-3 py-2.5 text-right font-mono ${totales.crecimientoNeto150 >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{fmtMoney(totales.crecimientoNeto150)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{fmtMoney(totales.amountAchieved)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{fmtMoney(totales.repagos)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{fmtDec(totales.tea)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{fmtNum(totales.opAchieved)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{fmtDec(t_plazoComercial)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{fmtNum(totales.sociosInicio)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{fmtNum(totales.sociosActual)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{fmtMoney(totales.cartera)}</td>
+                <td className="px-3 py-2.5 text-right font-mono bg-amber-500/10">{fmtMoney(totales.moraCppMax)}</td>
+                <td className="px-3 py-2.5 text-right font-mono bg-amber-500/10">{fmtMoney(totales.moraCppActual)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{t_pctMoraCppComercial.toFixed(2)}%</td>
+                <td className="px-3 py-2.5 text-right font-mono bg-rose-500/10">{fmtMoney(totales.moraDefMax)}</td>
+                <td className="px-3 py-2.5 text-right font-mono bg-rose-500/10">{fmtMoney(totales.moraDefActual)}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </Panel>
@@ -223,6 +251,18 @@ export function AgenciaView({ filters }: { filters: any }) {
                 </tr>
               )}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border font-bold bg-muted/20">
+                <td className="px-3 py-2.5">Total Recuperación</td>
+                <td className={`px-3 py-2.5 text-right font-mono ${totalesRec.crecimientoNeto150 >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{fmtMoney(totalesRec.crecimientoNeto150)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{fmtMoney(totalesRec.repagos)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{fmtMoney(totalesRec.carteraInicio)}</td>
+                <td className="px-3 py-2.5 text-right font-mono bg-amber-500/10">{fmtMoney(totalesRec.moraCppMax)}</td>
+                <td className="px-3 py-2.5 text-right font-mono bg-amber-500/10">{fmtMoney(totalesRec.moraCppActual)}</td>
+                <td className="px-3 py-2.5 text-right font-mono bg-rose-500/10">{fmtMoney(totalesRec.moraDefMax)}</td>
+                <td className="px-3 py-2.5 text-right font-mono bg-rose-500/10">{fmtMoney(totalesRec.moraDefActual)}</td>
+              </tr>
+            </tfoot>
           </table>
         </div>
       </Panel>

@@ -6,6 +6,7 @@ import { SectionBand } from '../components/ui/SectionBand';
 import { Panel } from '../components/ui/Panel';
 import { TableShell } from '../components/ui/TableShell';
 import { WorkdayStrip } from '../components/WorkdayStrip';
+import { Users, Clock3, ShieldAlert } from 'lucide-react';
 
 export function AsesoresView({ filters }: { filters: Filters }) {
   const { data: asesoresBD, isLoading: loadAsesores, error: errAsesores } = useQuery({
@@ -31,7 +32,7 @@ export function AsesoresView({ filters }: { filters: Filters }) {
   });
 
   if (loadAsesores || loadDias || !asesoresBD) return <LoadingState />;
-  if (errAsesores) return <div className="p-5 text-red-500 font-bold border border-red-200 bg-red-50 rounded-xl">Error de conexión al DWH.</div>;
+  if (errAsesores) return <div className="p-5 text-destructive font-semibold border border-destructive/20 bg-destructive/10 rounded-xl">Error de conexión al DWH.</div>;
 
   const dataDias = Array.isArray(diasBD) ? diasBD[0] : (diasBD || {});
   const keyTranscurridos = Object.keys(dataDias).find(k => k.toLowerCase().includes('trans')) || 'transcurridos';
@@ -40,7 +41,6 @@ export function AsesoresView({ filters }: { filters: Filters }) {
   const transcurridos = Math.max(1, Number(dataDias[keyTranscurridos]) || 12);
   const restantes = Number(dataDias[keyRestantes]) || 13;
 
-  // 🚨 LA VACUNA AVERAGEX: Sincronizamos la productividad con DAX
   const horaPeru = new Date().toLocaleString("en-US", { timeZone: "America/Lima" });
   const horaActual = new Date(horaPeru).getHours();
   const diasProductividadDAX = horaActual < 19 ? transcurridos + 1 : transcurridos;
@@ -58,246 +58,335 @@ export function AsesoresView({ filters }: { filters: Filters }) {
     return { ...row, opProjection };
   });
 
-  const cGreen = "bg-[#7cb361] text-white font-bold border-b border-white/20";
-  const cYellow = "bg-[#f0cb69] text-[hsl(35_80%_20%)] font-bold border-b border-white/20";
-  const cRed = "bg-[#e06c61] text-white font-bold border-b border-white/20";
-  const cNeutral = "text-muted-foreground border-b border-border/60";
+  // --- CÁLCULO DE TOTALES PARA LA FILA PIE DE TABLA ---
+  const sumTotal = (key: string) => datosProyectados.reduce((acc: number, curr: any) => acc + Number(curr[key] || 0), 0);
+  const avgTotal = (key: string) => datosProyectados.length > 0 ? sumTotal(key) / datosProyectados.length : 0;
 
-  const getCrecNetoColor = (val: number) => val >= 20000 ? cGreen : val >= 0 ? cYellow : cRed;
-  const getFaltanteColor = (val: number) => val <= 0 ? cGreen : val <= 20000 ? cYellow : cRed;
-  const getOperacionesColor = (val: number) => val >= 27 ? cGreen : val >= 20 ? cYellow : cRed;
-  const getDuracionColor = (val: number) => val >= 6 ? cGreen : cRed;
-  const getSociosColor = (val: number) => val > 0 ? cGreen : cRed;
-  const getExcedenteColor = (val: number) => val <= 0 ? cGreen : cRed;
-  const getCarteraColor = (val: number) => val >= 200000 ? cGreen : val >= 100000 ? cYellow : cRed;
+  const t_cartera = sumTotal('cartera');
+  const t_desembolsos = sumTotal('desembolsos');
+  const t_repagos = sumTotal('repagos');
+  const t_crecimientoBruto = sumTotal('crecimientoBruto');
+  const t_mora150 = sumTotal('mora150');
+  const t_pctMora150 = t_cartera > 0 ? (t_mora150 / t_cartera) * 100 : 0;
+  const t_crecimientoNeto150 = sumTotal('crecimientoNeto150');
+  const t_faltante20k = sumTotal('faltante20k');
+
+  const t_opAchieved = sumTotal('opAchieved');
+  const t_opProjection = sumTotal('opProjection');
+  const t_duracion = avgTotal('duracion');
+  const t_sociosInicio = sumTotal('sociosInicio');
+  const t_sociosActual = sumTotal('sociosActual');
+  const t_sociosNuevos = sumTotal('sociosNuevos');
+
+  const t_carteraInicio = sumTotal('carteraInicio');
+  const t_moraCppActual = sumTotal('moraCppActual');
+  const t_pctMoraCpp = t_carteraInicio > 0 ? (t_moraCppActual / t_carteraInicio) * 100 : 0;
+  const t_metaMoraCpp = avgTotal('metaMoraCpp');
+  const t_excedentePctCpp = avgTotal('excedentePctCpp');
+  const t_excedenteSolesCpp = sumTotal('excedenteSolesCpp');
+
+  const t_moraDefActual = sumTotal('moraDefActual');
+  const t_pctMoraDef = t_carteraInicio > 0 ? (t_moraDefActual / t_carteraInicio) * 100 : 0;
+  const t_metaMoraDef = avgTotal('metaMoraDef');
+  const t_excedentePctDef = avgTotal('excedentePctDef');
+  const t_excedenteSolesDef = sumTotal('excedenteSolesDef');
+
+  // Clases de semáforo estandarizadas con el look de Supervisión
+  const cGreen = "bg-emerald-500/20 text-emerald-700 font-bold";
+  const cYellow = "bg-amber-500/20 text-amber-800 font-bold";
+  const cRed = "bg-rose-500/20 text-rose-700 font-bold";
+
+  const getCrecNetoColor = (val: number) => val >= 20000 ? 'text-emerald-600 font-bold' : val >= 0 ? 'text-amber-600 font-bold' : 'text-rose-600 font-bold';
+  const getFaltanteColor = (val: number) => val <= 0 ? 'text-emerald-600 font-bold' : val <= 20000 ? 'text-amber-600 font-bold' : 'text-rose-600 font-bold';
+  const getOperacionesColor = (val: number) => val >= 27 ? 'text-emerald-600 font-bold' : val >= 20 ? 'text-amber-600 font-bold' : 'text-rose-600 font-bold';
+  const getDuracionColor = (val: number) => val >= 6 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold';
+  const getSociosColor = (val: number) => val > 0 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold';
+  const getExcedenteColor = (val: number) => val <= 0 ? 'text-emerald-600 font-bold' : 'text-rose-600 font-bold';
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-200" key={`${filters.period}-${filters.agency}-${filters.advisor}`}>
+    <div className="space-y-8 animate-in fade-in duration-500" key={`${filters.period}-${filters.agency}-${filters.advisor}`}>
       <WorkdayStrip periodo={filters.period} />
 
+      {/* 1. CARTERA COMERCIAL */}
       <SectionBand tone="green">CARTERA COMERCIAL</SectionBand>
-      <Panel title="Todos los Indicadores de Bonificación" eyebrow="Cartera y Crecimiento Neto 150">
-        <TableShell minWidth="1080px">
-          <table className="w-full text-[13px] whitespace-nowrap text-center">
+      <Panel title="Indicadores de Bonificación" icon={Users} eyebrow="Cartera y Crecimiento Neto 150">
+        <div className="overflow-x-auto pb-4">
+          <table className="w-full text-left text-[11px] whitespace-nowrap">
             <thead>
-              <tr className="bg-[hsl(202_76%_31%/.15)]">
-                <th colSpan={9} className="py-2 text-[15px] font-bold text-[hsl(202_76%_25%)]">Todos los Indicadores de Bonificación</th>
-              </tr>
-              <tr className="bg-muted/50 border-b border-border">
-                <th className="px-3 py-2.5 text-left font-bold text-muted-foreground">Asesor</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Cartera</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Desembolsos</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Repagos</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Crecimiento</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Mora 150</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">% Mora150</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Crecimiento Neto 150</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Faltante a S/20K</th>
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="px-3 pb-2 font-semibold">Asesor</th>
+                <th className="px-3 pb-2 font-semibold text-right">Cartera</th>
+                <th className="px-3 pb-2 font-semibold text-right">Desembolsos</th>
+                <th className="px-3 pb-2 font-semibold text-right">Repagos</th>
+                <th className="px-3 pb-2 font-semibold text-right">Crecimiento</th>
+                <th className="px-3 pb-2 font-semibold text-right">Mora 150</th>
+                <th className="px-3 pb-2 font-semibold text-right">% Mora150</th>
+                <th className="px-3 pb-2 font-semibold text-right bg-emerald-500/10">Crecimiento Neto 150</th>
+                <th className="px-3 pb-2 font-semibold text-right bg-amber-500/10">Faltante a S/20K</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border/50">
               {datosProyectados.map((row: any) => (
-                <tr key={row.asesor} className="hover:bg-muted/10 transition-colors">
-                  <td className="px-3 py-2 text-left font-semibold border-b border-border/60">{row.asesor}</td>
-                  <td className={`px-3 py-2 ${cNeutral}`}>{money(row.cartera)}</td>
-                  <td className={`px-3 py-2 ${cNeutral}`}>{money(row.desembolsos)}</td>
-                  <td className={`px-3 py-2 ${cNeutral}`}>{money(row.repagos)}</td>
-                  <td className={`px-3 py-2 ${cNeutral}`}>{money(row.crecimientoBruto)}</td>
-                  <td className={`px-3 py-2 ${cNeutral}`}>{money(row.mora150)}</td>
-                  <td className={`px-3 py-2 ${cNeutral}`}>{Number(row.pctMora150).toFixed(2)}%</td>
-                  <td className={`px-3 py-2 ${getCrecNetoColor(row.crecimientoNeto150)}`}>{money(row.crecimientoNeto150)}</td>
-                  <td className={`px-3 py-2 ${getFaltanteColor(row.faltante20k)}`}>{money(row.faltante20k)}</td>
+                <tr key={row.asesor} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-3 py-2.5 font-medium">{row.asesor}</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{money(row.cartera)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{money(row.desembolsos)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{money(row.repagos)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{money(row.crecimientoBruto)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{money(row.mora150)}</td>
+                  <td className="px-3 py-2.5 text-right font-mono">{Number(row.pctMora150).toFixed(2)}%</td>
+                  <td className={`px-3 py-2.5 text-right font-mono bg-emerald-500/10 ${getCrecNetoColor(row.crecimientoNeto150)}`}>{money(row.crecimientoNeto150)}</td>
+                  <td className={`px-3 py-2.5 text-right font-mono bg-amber-500/10 ${getFaltanteColor(row.faltante20k)}`}>{money(row.faltante20k)}</td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border font-bold bg-muted/20">
+                <td className="px-3 py-2.5">Total</td>
+                <td className="px-3 py-2.5 text-right font-mono">{money(t_cartera)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{money(t_desembolsos)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{money(t_repagos)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{money(t_crecimientoBruto)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{money(t_mora150)}</td>
+                <td className="px-3 py-2.5 text-right font-mono">{t_pctMora150.toFixed(2)}%</td>
+                <td className={`px-3 py-2.5 text-right font-mono bg-emerald-500/10 ${getCrecNetoColor(t_crecimientoNeto150)}`}>{money(t_crecimientoNeto150)}</td>
+                <td className={`px-3 py-2.5 text-right font-mono bg-amber-500/10 ${getFaltanteColor(t_faltante20k)}`}>{money(t_faltante20k)}</td>
+              </tr>
+            </tfoot>
           </table>
-        </TableShell>
+        </div>
       </Panel>
 
+      {/* 2. TABLAS SECUNDARIAS (Operaciones, Duración, Socios) */}
       <div className="grid gap-5 lg:grid-cols-3">
-        <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-soft)] overflow-hidden">
-          <div className="bg-muted/70 py-2.5 text-center font-bold text-muted-foreground border-b border-border">Operaciones</div>
-          <div className="max-h-[350px] overflow-y-auto mobile-scroll">
-            <table className="w-full text-[13px] text-center">
-              <thead className="sticky top-0 bg-card border-b border-border shadow-sm">
-                <tr>
-                  <th className="px-3 py-2 text-left font-semibold">Asesor</th>
-                  <th className="px-3 py-2 font-semibold">A la Fecha</th>
-                  <th className="px-3 py-2 font-semibold">Proyección</th>
+        
+        {/* OPERACIONES */}
+        <Panel title="Operaciones" icon={Users}>
+          <div className="overflow-x-auto pb-4">
+            <table className="w-full text-left text-[11px] whitespace-nowrap">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="px-3 pb-2 font-semibold">Asesor</th>
+                  <th className="px-3 pb-2 font-semibold text-right">A la Fecha</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Proyección</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/50">
                 {datosProyectados.map((row: any) => (
-                  <tr key={`op-${row.asesor}`}>
-                    <td className="px-3 py-1.5 text-left border-b border-border/60 text-[11px] font-semibold">{row.asesor}</td>
-                    <td className={`px-3 py-1.5 font-mono ${getOperacionesColor(row.opAchieved)}`}>{row.opAchieved}</td>
-                    <td className={`px-3 py-1.5 font-mono ${getOperacionesColor(row.opProjection)}`}>{row.opProjection}</td>
+                  <tr key={`op-${row.asesor}`} className="hover:bg-muted/30">
+                    <td className="px-3 py-2 font-medium">{row.asesor}</td>
+                    <td className={`px-3 py-2 text-right font-mono ${getOperacionesColor(row.opAchieved)}`}>{row.opAchieved}</td>
+                    <td className={`px-3 py-2 text-right font-mono ${getOperacionesColor(row.opProjection)}`}>{row.opProjection}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border font-bold bg-muted/20">
+                  <td className="px-3 py-2">Total</td>
+                  <td className="px-3 py-2 text-right font-mono">{t_opAchieved}</td>
+                  <td className="px-3 py-2 text-right font-mono">{t_opProjection}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
-        </div>
+        </Panel>
 
-        <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-soft)] overflow-hidden">
-          <div className="bg-muted/70 py-2.5 text-center font-bold text-muted-foreground border-b border-border">Duración</div>
-          <div className="max-h-[350px] overflow-y-auto mobile-scroll">
-            <table className="w-full text-[13px] text-center">
-              <thead className="sticky top-0 bg-card border-b border-border shadow-sm">
-                <tr>
-                  <th className="px-3 py-2 text-left font-semibold">Asesor</th>
-                  <th className="px-3 py-2 font-semibold">Duracion</th>
+        {/* DURACIÓN */}
+        <Panel title="Duración" icon={Clock3}>
+          <div className="overflow-x-auto pb-4">
+            <table className="w-full text-left text-[11px] whitespace-nowrap">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="px-3 pb-2 font-semibold">Asesor</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Duración</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/50">
                 {datosProyectados.map((row: any) => (
-                  <tr key={`dur-${row.asesor}`}>
-                    <td className="px-3 py-1.5 text-left border-b border-border/60 text-[11px] font-semibold">{row.asesor}</td>
-                    <td className={`px-3 py-1.5 font-mono ${getDuracionColor(row.duracion)}`}>{Number(row.duracion).toFixed(2)}</td>
+                  <tr key={`dur-${row.asesor}`} className="hover:bg-muted/30">
+                    <td className="px-3 py-2 font-medium">{row.asesor}</td>
+                    <td className={`px-3 py-2 text-right font-mono ${getDuracionColor(row.duracion)}`}>{Number(row.duracion).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border font-bold bg-muted/20">
+                  <td className="px-3 py-2">Promedio Ponderado</td>
+                  <td className="px-3 py-2 text-right font-mono">{t_duracion.toFixed(2)}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
-        </div>
+        </Panel>
 
-        <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-soft)] overflow-hidden">
-          <div className="bg-muted/70 py-2.5 text-center font-bold text-muted-foreground border-b border-border">Número de Socios</div>
-          <div className="max-h-[350px] overflow-y-auto mobile-scroll">
-            <table className="w-full text-[13px] text-center">
-              <thead className="sticky top-0 bg-card border-b border-border shadow-sm">
-                <tr>
-                  <th className="px-2 py-2 text-left font-semibold">Asesor</th>
-                  <th className="px-2 py-2 font-semibold">Inicio Mes</th>
-                  <th className="px-2 py-2 font-semibold">A la Fecha</th>
-                  <th className="px-2 py-2 font-semibold">Nuevos</th>
+        {/* NÚMERO DE SOCIOS */}
+        <Panel title="Número de Socios" icon={Users}>
+          <div className="overflow-x-auto pb-4">
+            <table className="w-full text-left text-[11px] whitespace-nowrap">
+              <thead>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="px-2 pb-2 font-semibold">Asesor</th>
+                  <th className="px-2 pb-2 font-semibold text-right">Inicio</th>
+                  <th className="px-2 pb-2 font-semibold text-right">Actual</th>
+                  <th className="px-2 pb-2 font-semibold text-right">Nuevos</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/50">
                 {datosProyectados.map((row: any) => (
-                  <tr key={`soc-${row.asesor}`}>
-                    <td className="px-2 py-1.5 text-left border-b border-border/60 text-[11px] font-semibold truncate max-w-[90px]" title={row.asesor}>{row.asesor}</td>
-                    <td className={`px-2 py-1.5 font-mono ${cNeutral}`}>{row.sociosInicio}</td>
-                    <td className={`px-2 py-1.5 font-mono ${cNeutral}`}>{row.sociosActual}</td>
-                    <td className={`px-2 py-1.5 font-mono ${getSociosColor(row.sociosNuevos)}`}>{row.sociosNuevos}</td>
+                  <tr key={`soc-${row.asesor}`} className="hover:bg-muted/30">
+                    <td className="px-2 py-2 font-medium truncate max-w-[100px]" title={row.asesor}>{row.asesor}</td>
+                    <td className="px-2 py-2 text-right font-mono">{row.sociosInicio}</td>
+                    <td className="px-2 py-2 text-right font-mono">{row.sociosActual}</td>
+                    <td className={`px-2 py-2 text-right font-mono ${getSociosColor(row.sociosNuevos)}`}>{row.sociosNuevos}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border font-bold bg-muted/20">
+                  <td className="px-2 py-2">Total</td>
+                  <td className="px-2 py-2 text-right font-mono">{t_sociosInicio}</td>
+                  <td className="px-2 py-2 text-right font-mono">{t_sociosActual}</td>
+                  <td className="px-2 py-2 text-right font-mono">{t_sociosNuevos}</td>
+                </tr>
+              </tfoot>
             </table>
           </div>
-        </div>
+        </Panel>
       </div>
 
+      {/* 3. MORA CPP Y MORA VENCIDA */}
       <div className="grid gap-5 xl:grid-cols-2">
-        <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-soft)] overflow-hidden">
-          <div className="bg-muted/70 py-2.5 text-center font-bold text-muted-foreground border-b border-border">Mora CPP</div>
-          <TableShell minWidth="600px">
-            <table className="w-full text-[13px] text-center whitespace-nowrap">
+        
+        {/* MORA CPP */}
+        <Panel title="Mora CPP" icon={ShieldAlert}>
+          <div className="overflow-x-auto pb-4">
+            <table className="w-full text-left text-[11px] whitespace-nowrap">
               <thead>
-                <tr className="border-b border-border">
-                  <th className="px-3 py-2 text-left font-semibold">Asesor</th>
-                  <th className="px-3 py-2 font-semibold">Cartera Inicio</th>
-                  <th className="px-3 py-2 font-semibold">Mora S/</th>
-                  <th className="px-3 py-2 font-semibold">Mora %</th>
-                  <th className="px-3 py-2 font-semibold">Meta %</th>
-                  <th className="px-3 py-2 font-semibold">Excedente %</th>
-                  <th className="px-3 py-2 font-semibold">Excedente S/</th>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="px-3 pb-2 font-semibold">Asesor</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Cartera Inicio</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Mora S/</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Mora %</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Meta %</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Excedente %</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Excedente S/</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/50">
                 {datosProyectados.map((row: any) => (
-                  <tr key={`cpp-${row.asesor}`}>
-                    <td className="px-3 py-1.5 text-left border-b border-border/60">{row.asesor}</td>
-                    <td className={`px-3 py-1.5 ${cNeutral}`}>{money(row.carteraInicio)}</td>
-                    <td className={`px-3 py-1.5 ${cNeutral}`}>{money(row.moraCppActual)}</td>
-                    <td className={`px-3 py-1.5 font-mono ${cNeutral}`}>{Number(row.pctMoraCpp).toFixed(2)}%</td>
-                    <td className={`px-3 py-1.5 font-mono ${cNeutral}`}>{Number(row.metaMoraCpp).toFixed(2)}%</td>
-                    <td className={`px-3 py-1.5 font-mono ${getExcedenteColor(row.excedentePctCpp)}`}>{Number(row.excedentePctCpp).toFixed(2)}%</td>
-                    <td className={`px-3 py-1.5 ${getExcedenteColor(row.excedenteSolesCpp)}`}>{money(row.excedenteSolesCpp)}</td>
+                  <tr key={`cpp-${row.asesor}`} className="hover:bg-muted/30">
+                    <td className="px-3 py-2 font-medium">{row.asesor}</td>
+                    <td className="px-3 py-2 text-right font-mono">{money(row.carteraInicio)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{money(row.moraCppActual)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(row.pctMoraCpp).toFixed(2)}%</td>
+                    <td className="px-3 py-2 text-right font-mono text-muted-foreground">{Number(row.metaMoraCpp).toFixed(2)}%</td>
+                    <td className={`px-3 py-2 text-right font-mono ${getExcedenteColor(row.excedentePctCpp)}`}>{Number(row.excedentePctCpp).toFixed(2)}%</td>
+                    <td className={`px-3 py-2 text-right font-mono ${getExcedenteColor(row.excedenteSolesCpp)}`}>{money(row.excedenteSolesCpp)}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border font-bold bg-muted/20">
+                  <td className="px-3 py-2">Total</td>
+                  <td className="px-3 py-2 text-right font-mono">{money(t_carteraInicio)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{money(t_moraCppActual)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{t_pctMoraCpp.toFixed(2)}%</td>
+                  <td className="px-3 py-2 text-right font-mono">{t_metaMoraCpp.toFixed(2)}%</td>
+                  <td className="px-3 py-2 text-right font-mono">{t_excedentePctCpp.toFixed(2)}%</td>
+                  <td className={`px-3 py-2 text-right font-mono ${getExcedenteColor(t_excedenteSolesCpp)}`}>{money(t_excedenteSolesCpp)}</td>
+                </tr>
+              </tfoot>
             </table>
-          </TableShell>
-        </div>
+          </div>
+        </Panel>
 
-        <div className="rounded-xl border border-border bg-card shadow-[var(--shadow-soft)] overflow-hidden">
-          <div className="bg-muted/70 py-2.5 text-center font-bold text-muted-foreground border-b border-border">Mora Vencida</div>
-          <TableShell minWidth="600px">
-            <table className="w-full text-[13px] text-center whitespace-nowrap">
+        {/* MORA VENCIDA */}
+        <Panel title="Mora Vencida" icon={ShieldAlert}>
+          <div className="overflow-x-auto pb-4">
+            <table className="w-full text-left text-[11px] whitespace-nowrap">
               <thead>
-                <tr className="border-b border-border">
-                  <th className="px-3 py-2 text-left font-semibold">Asesor</th>
-                  <th className="px-3 py-2 font-semibold">Cartera Inicio</th>
-                  <th className="px-3 py-2 font-semibold">Mora S/</th>
-                  <th className="px-3 py-2 font-semibold">Mora %</th>
-                  <th className="px-3 py-2 font-semibold">Meta %</th>
-                  <th className="px-3 py-2 font-semibold">Excedente %</th>
-                  <th className="px-3 py-2 font-semibold">Excedente S/</th>
+                <tr className="border-b border-border text-muted-foreground">
+                  <th className="px-3 pb-2 font-semibold">Asesor</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Cartera Inicio</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Mora S/</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Mora %</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Meta %</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Excedente %</th>
+                  <th className="px-3 pb-2 font-semibold text-right">Excedente S/</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-border/50">
                 {datosProyectados.map((row: any) => (
-                  <tr key={`venc-${row.asesor}`}>
-                    <td className="px-3 py-1.5 text-left border-b border-border/60">{row.asesor}</td>
-                    <td className={`px-3 py-1.5 ${cNeutral}`}>{money(row.carteraInicio)}</td>
-                    <td className={`px-3 py-1.5 ${cNeutral}`}>{money(row.moraDefActual)}</td>
-                    <td className={`px-3 py-1.5 font-mono ${cNeutral}`}>{Number(row.pctMoraDef).toFixed(2)}%</td>
-                    <td className={`px-3 py-1.5 font-mono ${cNeutral}`}>{Number(row.metaMoraDef).toFixed(2)}%</td>
-                    <td className={`px-3 py-1.5 font-mono ${getExcedenteColor(row.excedentePctDef)}`}>{Number(row.excedentePctDef).toFixed(2)}%</td>
-                    <td className={`px-3 py-1.5 ${getExcedenteColor(row.excedenteSolesDef)}`}>{money(row.excedenteSolesDef)}</td>
+                  <tr key={`venc-${row.asesor}`} className="hover:bg-muted/30">
+                    <td className="px-3 py-2 font-medium">{row.asesor}</td>
+                    <td className="px-3 py-2 text-right font-mono">{money(row.carteraInicio)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{money(row.moraDefActual)}</td>
+                    <td className="px-3 py-2 text-right font-mono">{Number(row.pctMoraDef).toFixed(2)}%</td>
+                    <td className="px-3 py-2 text-right font-mono text-muted-foreground">{Number(row.metaMoraDef).toFixed(2)}%</td>
+                    <td className={`px-3 py-2 text-right font-mono ${getExcedenteColor(row.excedentePctDef)}`}>{Number(row.excedentePctDef).toFixed(2)}%</td>
+                    <td className={`px-3 py-2 text-right font-mono ${getExcedenteColor(row.excedenteSolesDef)}`}>{money(row.excedenteSolesDef)}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-border font-bold bg-muted/20">
+                  <td className="px-3 py-2">Total</td>
+                  <td className="px-3 py-2 text-right font-mono">{money(t_carteraInicio)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{money(t_moraDefActual)}</td>
+                  <td className="px-3 py-2 text-right font-mono">{t_pctMoraDef.toFixed(2)}%</td>
+                  <td className="px-3 py-2 text-right font-mono">{t_metaMoraDef.toFixed(2)}%</td>
+                  <td className="px-3 py-2 text-right font-mono">{t_excedentePctDef.toFixed(2)}%</td>
+                  <td className={`px-3 py-2 text-right font-mono ${getExcedenteColor(t_excedenteSolesDef)}`}>{money(t_excedenteSolesDef)}</td>
+                </tr>
+              </tfoot>
             </table>
-          </TableShell>
-        </div>
+          </div>
+        </Panel>
       </div>
 
-      <Panel title="Resumen. Indicadores de Bonificación" eyebrow="Bonos condicionados a Candado y Multiplicadores">
-        <TableShell minWidth="1200px">
-          <table className="w-full text-[13px] text-center whitespace-nowrap">
+      {/* 4. RESUMEN DE BONIFICACIÓN */}
+      <SectionBand tone="blue">Resumen de Bonificación</SectionBand>
+      <Panel title="Indicadores de Bonificación" icon={Users} eyebrow="Bonos condicionados a Candado y Multiplicadores">
+        <div className="overflow-x-auto pb-4">
+          <table className="w-full text-left text-[11px] whitespace-nowrap">
             <thead>
-              <tr className="bg-muted/50 border-b border-border">
-                <th className="px-3 py-2.5 text-left font-bold text-muted-foreground">Asesor</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Duracion<br/>(Candado)</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Cartera<br/>(Cond. Adicional)</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Nro Oper<br/>(Bono Base)</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Nro Oper<br/>Proyeccion</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Crecimiento Neto 150<br/>(Mult.)</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Socios Nuevos<br/>(Mult.)</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Excedente Mora CPP<br/>(Mult.)</th>
-                <th className="px-3 py-2.5 font-bold text-muted-foreground">Excedente Mora Vencida<br/>(Mult.)</th>
+              <tr className="border-b border-border text-muted-foreground">
+                <th className="px-3 pb-2 font-semibold">Asesor</th>
+                <th className="px-3 pb-2 font-semibold text-right">Duración (Candado)</th>
+                <th className="px-3 pb-2 font-semibold text-right">Cartera (Cond. Adicional)</th>
+                <th className="px-3 pb-2 font-semibold text-right">Nro Oper (Bono Base)</th>
+                <th className="px-3 pb-2 font-semibold text-right">Nro Oper Proyección</th>
+                <th className="px-3 pb-2 font-semibold text-right">Crec. Neto 150 (Mult.)</th>
+                <th className="px-3 pb-2 font-semibold text-right">Socios Nuevos (Mult.)</th>
+                <th className="px-3 pb-2 font-semibold text-right">Excedente Mora CPP (Mult.)</th>
+                <th className="px-3 pb-2 font-semibold text-right">Excedente Mora Vencida (Mult.)</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-border/50">
               {datosProyectados.map((row: any) => (
-                <tr key={`res-${row.asesor}`} className="hover:bg-muted/10 transition-colors">
-                  <td className="px-3 py-2 text-left font-semibold border-b border-border/60">{row.asesor}</td>
-                  <td className={`px-3 py-2 font-mono ${getDuracionColor(row.duracion)}`}>{Number(row.duracion).toFixed(2)}</td>
-                  <td className={`px-3 py-2 ${getCarteraColor(row.cartera)}`}>{money(row.cartera)}</td>
-                  <td className={`px-3 py-2 font-mono ${getOperacionesColor(row.opAchieved)}`}>{row.opAchieved}</td>
-                  <td className={`px-3 py-2 font-mono ${getOperacionesColor(row.opProjection)}`}>{row.opProjection}</td>
-                  <td className={`px-3 py-2 ${getCrecNetoColor(row.crecimientoNeto150)}`}>{money(row.crecimientoNeto150)}</td>
-                  <td className={`px-3 py-2 font-mono ${getSociosColor(row.sociosNuevos)}`}>{row.sociosNuevos}</td>
-                  <td className={`px-3 py-2 ${getExcedenteColor(row.excedenteSolesCpp)}`}>{money(row.excedenteSolesCpp)}</td>
-                  <td className={`px-3 py-2 ${getExcedenteColor(row.excedenteSolesDef)}`}>{money(row.excedenteSolesDef)}</td>
+                <tr key={`res-${row.asesor}`} className="hover:bg-muted/30">
+                  <td className="px-3 py-2 font-medium">{row.asesor}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${getDuracionColor(row.duracion)}`}>{Number(row.duracion).toFixed(2)}</td>
+                  <td className={`px-3 py-2 text-right font-mono`}>{money(row.cartera)}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${getOperacionesColor(row.opAchieved)}`}>{row.opAchieved}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${getOperacionesColor(row.opProjection)}`}>{row.opProjection}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${getCrecNetoColor(row.crecimientoNeto150)}`}>{money(row.crecimientoNeto150)}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${getSociosColor(row.sociosNuevos)}`}>{row.sociosNuevos}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${getExcedenteColor(row.excedenteSolesCpp)}`}>{money(row.excedenteSolesCpp)}</td>
+                  <td className={`px-3 py-2 text-right font-mono ${getExcedenteColor(row.excedenteSolesDef)}`}>{money(row.excedenteSolesDef)}</td>
                 </tr>
               ))}
             </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-border font-bold bg-muted/20">
+                <td className="px-3 py-2" colSpan={5}>Total General</td>
+                <td className={`px-3 py-2 text-right font-mono ${getCrecNetoColor(t_crecimientoNeto150)}`}>{money(t_crecimientoNeto150)}</td>
+                <td className="px-3 py-2 text-right font-mono">{t_sociosNuevos}</td>
+                <td className={`px-3 py-2 text-right font-mono ${getExcedenteColor(t_excedenteSolesCpp)}`}>{money(t_excedenteSolesCpp)}</td>
+                <td className={`px-3 py-2 text-right font-mono ${getExcedenteColor(t_excedenteSolesDef)}`}>{money(t_excedenteSolesDef)}</td>
+              </tr>
+            </tfoot>
           </table>
-        </TableShell>
-        
-        <div className="mt-6 rounded-lg bg-[hsl(var(--accent)/.1)] p-4 text-[11px] leading-5 text-muted-foreground">
-          <strong className="text-foreground underline underline-offset-2">Criterios de colores:</strong>
-          <ul className="mt-2 list-inside list-disc space-y-1 marker:text-foreground/40">
-            <li><strong>Duración (CANDADO):</strong> verde (&gt;= 6) | rojo (&lt; 6)</li>
-            <li><strong>Cartera (CONDICION ADICIONAL):</strong> verde (&gt;= S/200,000) aplica multiplicadores | amarillo (S/100,000 a S/200,000) aplica multiplicador automático de 50% | rojo (&lt; S/100,000) aplica multiplicador automático de 30%</li>
-            <li><strong>Crecimiento Neto 150:</strong> verde (&gt;= S/20,000) | amarillo (entre S/0 y S/20,000) | rojo (&lt; S/0)</li>
-            <li><strong>Nro Operaciones:</strong> verde (&gt;= 27) | amarillo (&gt;= 20) | rojo (&lt; 20)</li>
-            <li><strong>Mora CPP:</strong> según meta particular por asesor</li>
-            <li><strong>Mora Deficiente:</strong> según meta particular por asesor</li>
-          </ul>
         </div>
       </Panel>
     </div>

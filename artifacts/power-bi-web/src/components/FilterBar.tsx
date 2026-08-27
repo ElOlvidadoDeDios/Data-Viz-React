@@ -17,12 +17,12 @@ export function FilterBar({ filters, setFilters, showFilters, setShowFilters, re
   const [location] = useLocation();
   const pathView = location.slice(1);
   
-  // La vista principal (Gerencia) es la ruta raíz '/'
-  const isGerencia = pathView === '' || pathView === 'gerencia';
+  // Vistas que NO deben mostrar el filtro de Asesor ni Fecha
+  const isGerenciaOrSupervision = pathView === '' || pathView === 'gerencia' || pathView === 'supervision';
 
   // Ocultamos los selectores si no hay datos o la vista no los necesita
-  const showAdvisorFilter = !isGerencia && dbFilters?.asesores?.length > 0;
-  const showDateFilter = !isGerencia;
+  const showAdvisorFilter = !isGerenciaOrSupervision && dbFilters?.asesores?.length > 0;
+  const showDateFilter = !isGerenciaOrSupervision;
 
   if (!showFilters) {
     return (
@@ -86,9 +86,11 @@ export function FilterBar({ filters, setFilters, showFilters, setShowFilters, re
               className="max-w-[200px] truncate rounded-lg border-0 bg-muted/50 px-3 py-1.5 text-xs font-semibold hover:bg-muted focus:ring-1 focus:ring-[hsl(var(--primary))] transition-colors"
             >
               <option value="Todos">Todos</option>
-              {dbFilters.asesores.map((a: string) => (
-                <option key={a} value={a}>{a}</option>
-              ))}
+              {dbFilters?.asesores?.map((a: any, idx: number) => {
+                // Si el backend envía un objeto, extraemos solo el nombre del asesor
+                const val = typeof a === 'object' ? (a.Asesor || a.asesor || Object.values(a)[0]) : a;
+                return <option key={idx} value={val}>{val}</option>;
+              })}
             </select>
           </div>
         )}
