@@ -1,3 +1,5 @@
+//StatusCell.tsx
+
 import { CheckCircle2, AlertTriangle } from 'lucide-react';
 import { money } from '../../utils/formatters';
 

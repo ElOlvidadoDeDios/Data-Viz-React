@@ -1,3 +1,5 @@
+//CompletionBar.tsx
+
 export function CompletionBar({ achieved, target, label = 'Cumplimiento porcentual de la meta mensual' }: { achieved: number; target: number; label?: string }) {
   const value = Math.min(100, Math.round((achieved / target) * 100));
   

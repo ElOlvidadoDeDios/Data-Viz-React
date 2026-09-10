@@ -1,3 +1,5 @@
+//error-boundary.tsx
+
 import {
   Component,
   type ComponentType,

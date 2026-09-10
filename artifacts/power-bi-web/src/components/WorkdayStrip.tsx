@@ -1,3 +1,5 @@
+//WorkdayStrip.tsx
+
 import { useQuery } from '@tanstack/react-query';
 import { CalendarDays, Clock3, Target } from 'lucide-react';
 

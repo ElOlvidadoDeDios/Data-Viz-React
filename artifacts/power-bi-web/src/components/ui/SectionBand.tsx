@@ -1,3 +1,5 @@
+//SectionBand.tsx
+
 import { ReactNode } from 'react';
 
 export function SectionBand({ children, tone = 'green' }: { children: ReactNode; tone?: 'green' | 'blue' | 'coral' }) {

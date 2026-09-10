@@ -1,3 +1,5 @@
+//KpiCard.tsx
+
 import { ArrowDownRight, ArrowUpRight, LucideIcon } from 'lucide-react';
 
 export function KpiCard({ label, value, note, icon: Icon, tone = 'teal', delta }: { label: string; value: string; note: string; icon: LucideIcon; tone?: 'teal' | 'gold' | 'blue' | 'red'; delta?: string }) {

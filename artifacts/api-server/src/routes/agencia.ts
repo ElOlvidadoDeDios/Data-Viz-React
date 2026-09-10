@@ -1,3 +1,5 @@
+//routes/agencia.ts
+
 import { Router, Request, Response } from "express";
 import sql from "mssql/msnodesqlv8.js";
 
@@ -28,7 +30,17 @@ router.get(["/agencia", "/api/agencia"], async (req: Request, res: Response) => 
         -- =================================================================
         -- 1. ASESORES COMERCIALES
         -- =================================================================
-        WITH CTE_Asesores_Com AS (
+        WITH CTE_Metas_Agencia AS (
+            SELECT IdSAgencia, ISNULL(SUM(Mora9Meta), 0.10) AS MetaMoraCPP, ISNULL(SUM(Mora31Meta), 0.05) AS MetaMoraDeficiente
+            FROM dm_productividad.dbo.fct_stock_manubl_agencia_month
+            WHERE Periodo = @periodo GROUP BY IdSAgencia
+        ),
+        CTE_Metas_Asesor AS (
+            SELECT IdSAsesor, ISNULL(SUM(CarteraInicial), 0) AS CarteraInicial
+            FROM dm_productividad.dbo.fct_stock_manubl_asesor_month
+            WHERE Periodo = @periodo GROUP BY IdSAsesor
+        ),
+        CTE_Asesores_Com AS (
             SELECT IdSAsesor, IdSAgencia, AsesorNombresApellidos AS Asesor, ISNULL(ColocacionNumMeta, 30) AS MetaAsesor
             FROM DWH_Gestion_Cartera.dbo.dim_asesor 
             WHERE Periodo = @periodo AND (Cargo <> 'RECUPERADOR' OR Cargo IS NULL)
@@ -44,16 +56,15 @@ router.get(["/agencia", "/api/agencia"], async (req: Request, res: Response) => 
             WHERE Periodo = @periodo GROUP BY IdSAsesor
         ),
         CTE_MetasStock_Com AS (
-            SELECT A.IdSAsesor, A.IdSAgencia,
-                ISNULL((SELECT SUM(Mora9Meta) FROM dm_productividad.dbo.fct_stock_manubl_agencia_month M WHERE M.IdSAgencia = A.IdSAgencia AND M.Periodo = @periodo), 0.10) AS MetaMoraCPP,
-                ISNULL((SELECT SUM(Mora31Meta) FROM dm_productividad.dbo.fct_stock_manubl_agencia_month M WHERE M.IdSAgencia = A.IdSAgencia AND M.Periodo = @periodo), 0.05) AS MetaMoraDeficiente,
-                ISNULL((SELECT SUM(CarteraInicial) FROM dm_productividad.dbo.fct_stock_manubl_asesor_month CI WHERE CI.IdSAsesor = A.IdSAsesor AND CI.Periodo = @periodo), 0) AS CarteraInicial
+            SELECT A.IdSAsesor, A.IdSAgencia, ISNULL(MA.MetaMoraCPP, 0.10) AS MetaMoraCPP, ISNULL(MA.MetaMoraDeficiente, 0.05) AS MetaMoraDeficiente, ISNULL(MAS.CarteraInicial, 0) AS CarteraInicial
             FROM CTE_Asesores_Com A
+            LEFT JOIN CTE_Metas_Agencia MA ON A.IdSAgencia = MA.IdSAgencia
+            LEFT JOIN CTE_Metas_Asesor MAS ON A.IdSAsesor = MAS.IdSAsesor
         )
         SELECT 
             CASE A.IdSAgencia WHEN '01' THEN 'Wanchaq' WHEN '02' THEN 'San Jerónimo' WHEN '03' THEN 'Quillabamba' WHEN '04' THEN 'Sicuani' WHEN '05' THEN 'Molino' WHEN '06' THEN 'Juliaca' WHEN '07' THEN 'Lima Los Olivos' WHEN '08' THEN 'Tica Tica' WHEN '09' THEN 'Magisterio' WHEN '10' THEN 'Lima SJL' WHEN '11' THEN 'Chiclayo' WHEN '12' THEN 'Arequipa' WHEN '13' THEN 'Pucallpa' ELSE 'Otra Agencia' END AS agency,
             A.Asesor AS asesor, 
-            A.MetaAsesor AS metaAsesor, -- ✨ NUEVO CAMPO: Meta individual del asesor
+            A.MetaAsesor AS metaAsesor,
             ((ISNULL(F.Desembolsos, 0) - ISNULL(F.Repagos, 0)) - ISNULL(S.Mora150, 0)) AS crecimientoNeto150, 
             ISNULL(F.Desembolsos, 0) AS amountAchieved, ISNULL(F.Repagos, 0) AS repagos, ISNULL(S.TEA, 0) AS tea, ISNULL(F.NroOper, 0) AS opAchieved,
             CASE WHEN ISNULL(F.NroOper, 0) > 0 THEN (ISNULL(S.Varios, 0) / CAST(F.NroOper AS FLOAT)) / 5.0 ELSE 0 END AS plazo, ISNULL(S.SociosInicio, 0) AS sociosInicio, ISNULL(S.SociosActual, 0) AS sociosActual, ISNULL(S.Cartera, 0) AS cartera,
@@ -68,7 +79,15 @@ router.get(["/agencia", "/api/agencia"], async (req: Request, res: Response) => 
         -- =================================================================
         -- 2. RECUPERADORES
         -- =================================================================
-        WITH CTE_Rec_List AS (
+        WITH CTE_Metas_Agencia AS (
+            SELECT IdSAgencia, ISNULL(SUM(Mora9Meta), 0.10) AS MetaMoraCPP, ISNULL(SUM(Mora31Meta), 0.05) AS MetaMoraDeficiente
+            FROM dm_productividad.dbo.fct_stock_manubl_agencia_month WHERE Periodo = @periodo GROUP BY IdSAgencia
+        ),
+        CTE_Metas_Asesor AS (
+            SELECT IdSAsesor, ISNULL(SUM(CarteraInicial), 0) AS CarteraInicial
+            FROM dm_productividad.dbo.fct_stock_manubl_asesor_month WHERE Periodo = @periodo GROUP BY IdSAsesor
+        ),
+        CTE_Rec_List AS (
             SELECT IdSAsesor, IdSAgencia, AsesorNombresApellidos AS Recuperador FROM DWH_Gestion_Cartera.dbo.dim_asesor WHERE Periodo = @periodo AND Cargo = 'RECUPERADOR'
         ),
         CTE_Flow_Rec AS (
@@ -78,11 +97,10 @@ router.get(["/agencia", "/api/agencia"], async (req: Request, res: Response) => 
             SELECT IdSAsesor, ISNULL(SUM(Cartera), 0) AS Cartera, ISNULL(SUM(Mora9), 0) AS MoraCPP, ISNULL(SUM(Mora31), 0) AS MoraDeficiente, ISNULL(SUM(Mora150), 0) AS Mora150 FROM DWH_Gestion_Cartera.dbo.fct_stock WHERE Periodo = @periodo GROUP BY IdSAsesor
         ),
         CTE_MetasStock_Rec AS (
-            SELECT R.IdSAsesor, R.IdSAgencia,
-                ISNULL((SELECT SUM(Mora9Meta) FROM dm_productividad.dbo.fct_stock_manubl_agencia_month M WHERE M.IdSAgencia = R.IdSAgencia AND M.Periodo = @periodo), 0.10) AS MetaMoraCPP,
-                ISNULL((SELECT SUM(Mora31Meta) FROM dm_productividad.dbo.fct_stock_manubl_agencia_month M WHERE M.IdSAgencia = R.IdSAgencia AND M.Periodo = @periodo), 0.05) AS MetaMoraDeficiente,
-                ISNULL((SELECT SUM(CarteraInicial) FROM dm_productividad.dbo.fct_stock_manubl_asesor_month A WHERE A.IdSAsesor = R.IdSAsesor AND A.Periodo = @periodo), 0) AS CarteraInicial
+            SELECT R.IdSAsesor, R.IdSAgencia, ISNULL(MA.MetaMoraCPP, 0.10) AS MetaMoraCPP, ISNULL(MA.MetaMoraDeficiente, 0.05) AS MetaMoraDeficiente, ISNULL(MAS.CarteraInicial, 0) AS CarteraInicial
             FROM CTE_Rec_List R
+            LEFT JOIN CTE_Metas_Agencia MA ON R.IdSAgencia = MA.IdSAgencia
+            LEFT JOIN CTE_Metas_Asesor MAS ON R.IdSAsesor = MAS.IdSAsesor
         )
         SELECT 
             CASE R.IdSAgencia WHEN '01' THEN 'Wanchaq' WHEN '02' THEN 'San Jerónimo' WHEN '03' THEN 'Quillabamba' WHEN '04' THEN 'Sicuani' WHEN '05' THEN 'Molino' WHEN '06' THEN 'Juliaca' WHEN '07' THEN 'Lima Los Olivos' WHEN '08' THEN 'Tica Tica' WHEN '09' THEN 'Magisterio' WHEN '10' THEN 'Lima SJL' WHEN '11' THEN 'Chiclayo' WHEN '12' THEN 'Arequipa' WHEN '13' THEN 'Pucallpa' ELSE 'Otra Agencia' END AS agency,
@@ -91,7 +109,7 @@ router.get(["/agencia", "/api/agencia"], async (req: Request, res: Response) => 
         FROM CTE_Rec_List R LEFT JOIN CTE_Flow_Rec F ON R.IdSAsesor = F.IdSAsesor LEFT JOIN CTE_Stock_Rec S ON R.IdSAsesor = S.IdSAsesor LEFT JOIN CTE_MetasStock_Rec MS ON R.IdSAsesor = MS.IdSAsesor ORDER BY moraCppActual DESC;
 
         -- =================================================================
-        -- 3. RESUMEN DE AGENCIA (Para obtener Meta de Operaciones)
+        -- 3. RESUMEN DE AGENCIA 
         -- =================================================================
         SELECT 
             CASE IdSAgencia WHEN '01' THEN 'Wanchaq' WHEN '02' THEN 'San Jerónimo' WHEN '03' THEN 'Quillabamba' WHEN '04' THEN 'Sicuani' WHEN '05' THEN 'Molino' WHEN '06' THEN 'Juliaca' WHEN '07' THEN 'Lima Los Olivos' WHEN '08' THEN 'Tica Tica' WHEN '09' THEN 'Magisterio' WHEN '10' THEN 'Lima SJL' WHEN '11' THEN 'Chiclayo' WHEN '12' THEN 'Arequipa' WHEN '13' THEN 'Pucallpa' ELSE 'Otra Agencia' END AS agency,

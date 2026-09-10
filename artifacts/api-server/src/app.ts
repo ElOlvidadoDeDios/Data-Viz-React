@@ -1,3 +1,5 @@
+//app.ts
+
 import express from 'express';
 import cors from 'cors';
 import routes from './routes'; // Importa el enrutador que tienes en la carpeta routes

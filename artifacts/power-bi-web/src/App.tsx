@@ -1,12 +1,16 @@
+//App.tsx
+
 import { useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { Toaster, toast } from 'sonner';
 import { useLocation } from 'wouter';
+import { Activity } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 import {
   BarChart3, Bell, Building2, CalendarDays, CircleHelp,
   Download, LayoutDashboard, Menu, MoreHorizontal, RefreshCw,
-  Search, Share2, SlidersHorizontal, Target, TrendingUp, Users, X
+  Search, Share2, SlidersHorizontal, Target, TrendingUp, Users, X, LineChart, Ban
 } from 'lucide-react';
 
 // ==========================================
@@ -22,10 +26,14 @@ import { AgenciaView } from './views/AgenciaView';
 import { AsesoresView } from './views/AsesoresView';
 import { ColocacionesView } from './views/ColocacionesView';
 import { ProductividadDiaria } from './views/ProductividadDiaria';
+import { EvolucionView } from './views/EvolucionView';
+import { CanceladosView } from './views/CanceladosView';
+import { AvanceView } from './views/AvanceView';
+import { RankingView } from './views/RankingView';
 
 const queryClient = new QueryClient();
 
-export type View = 'gerencia' | 'supervision' | 'agencia' | 'asesores' | 'colocaciones' | 'diaria';
+export type View = 'gerencia' | 'supervision' | 'agencia' | 'asesores' | 'colocaciones' | 'diaria' | 'evolucion' | 'cancelados' | 'avance' | 'ranking';
 export type Filters = { period: string; agency: string; advisor: string; day: string };
 
 const viewMeta: Record<View, { label: string; eyebrow: string; title: string; subtitle: string }> = {
@@ -35,6 +43,10 @@ const viewMeta: Record<View, { label: string; eyebrow: string; title: string; su
   asesores: { label: 'Indicadores Asesores', eyebrow: 'Seguimiento de equipos', title: 'La productividad se construye asesor por asesor.', subtitle: 'Identifica desempeño, duración, socios nuevos, mora y faltante a la meta de S/ 20K.' },
   colocaciones: { label: 'Colocaciones', eyebrow: 'Ritmo de colocación', title: 'El objetivo del mes se vuelve alcanzable.', subtitle: 'Monitorea meta, logrado y proyección para anticiparte al cierre de la agencia.' },
   diaria: { label: 'Productividad Diaria', eyebrow: 'Metas, proyecciones y colocaciones logradas', title: 'La gestión de hoy define el cierre.', subtitle: 'Compara cantidad y monto de colocaciones frente a la meta diaria de cada agencia.' },
+  evolucion: { label: 'Evolución Histórica', eyebrow: 'Análisis de tendencias a largo plazo', title: 'El historial revela el verdadero crecimiento.', subtitle: 'Analiza el flujo de colocaciones y la calidad de cartera durante los últimos 12 meses.' },
+  cancelados: { label: 'Cancelados No Renovados', eyebrow: 'Oportunidades de Retención', title: 'Seguimiento a créditos finalizados.', subtitle: 'Analiza los socios que cancelaron y no volvieron a sacar un crédito en los últimos 6 meses.' },
+  avance: { label: 'Avance de Cartera', eyebrow: 'Progreso de Cobranza', title: 'Monitoreo del % de Avance por Socio.', subtitle: 'Listado detallado del avance de pagos, facilitando el seguimiento para futuras renovaciones.' },
+  ranking: { label: 'Productividad Asesores', eyebrow: 'Ranking Comercial', title: 'Top de asesores por operaciones.', subtitle: 'Revisa quién lidera las colocaciones en cada periodo y su respectivo administrador.' },
 };
 
 export default function App() {
@@ -101,6 +113,10 @@ function Dashboard() {
               ['asesores', 'Indicadores Asesores', Users],
               ['colocaciones', 'Colocaciones', Target],
               ['diaria', 'Productividad Diaria', TrendingUp],
+              ['evolucion', 'Evolución Histórica', LineChart],
+              ['cancelados', 'Cancelados No Renovados', Ban],
+              ['avance', 'Avance de Cartera', Activity],
+              ['ranking', 'Productividad Asesores', Trophy],
             ] as const).map(([view, label, Icon]) => (
               <button key={view} onClick={() => navigate(view)} className={`group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[12px] font-semibold transition-all ${activeView === view ? 'bg-[hsl(var(--sidebar-accent))] text-[hsl(var(--sidebar-accent-foreground))] shadow-[inset_3px_0_0_hsl(var(--sidebar-primary))]' : 'text-[hsl(var(--sidebar-foreground)/.64)] hover:bg-[hsl(var(--sidebar-accent)/.7)] hover:text-[hsl(var(--sidebar-foreground))]'}`}><Icon size={16} strokeWidth={activeView === view ? 2.4 : 1.8} /><span>{label}</span>{activeView === view && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-[hsl(var(--sidebar-primary))]" />}</button>
             ))}
@@ -129,7 +145,7 @@ function Dashboard() {
           <div className="mb-6 flex items-center justify-between text-[11px] text-muted-foreground"><span>Actualizado {lastUpdated} · Fuente: SQL Server DWH</span></div>
           
           <div className={isRefreshing ? "opacity-40 pointer-events-none transition-opacity duration-300" : "transition-opacity duration-300"}>
-            <DashboardView activeView={activeView} filters={filters} navigate={navigate} />
+            <DashboardView activeView={activeView} filters={filters} navigate={navigate} dbFilters={dbFilters} />
           </div>
         </div>
       </main>
@@ -137,13 +153,17 @@ function Dashboard() {
   );
 }
 
-// 3. ORQUESTADOR DE RUTAS (Si Vite te da error con "ProductividadDiaria", quítale o ponle las llaves `{ }` en la importación arriba dependiendo de cómo lo exportaste)
-function DashboardView({ activeView, filters, navigate }: { activeView: View; filters: Filters; navigate: (view: View) => void }) {
+// 3. ORQUESTADOR DE RUTAS
+function DashboardView({ activeView, filters, navigate, dbFilters }: { activeView: View; filters: Filters; navigate: (view: View) => void, dbFilters: any }) {
   if (activeView === 'supervision') return <SupervisionAgenciasView navigate={navigate} filters={filters} />;
   if (activeView === 'agencia') return <AgenciaView filters={filters} />;
   if (activeView === 'asesores') return <AsesoresView filters={filters} />;
   if (activeView === 'colocaciones') return <ColocacionesView filters={filters} />;
   if (activeView === 'diaria') return <ProductividadDiaria filters={filters} />;
+  if (activeView === 'evolucion') return <EvolucionView dbFilters={dbFilters} />;
+  if (activeView === 'cancelados') return <CanceladosView dbFilters={dbFilters} />;
+  if (activeView === 'avance') return <AvanceView dbFilters={dbFilters} />;
+  if (activeView === 'ranking') return <RankingView dbFilters={dbFilters} />;
   
   return <GerenciaView navigate={navigate} filters={filters} />; 
 }

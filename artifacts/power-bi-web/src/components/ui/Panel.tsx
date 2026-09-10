@@ -1,3 +1,5 @@
+//Panel.tsx
+
 import { ReactNode } from 'react';
 
 export function Panel({ title, eyebrow, children, action }: { title: string; eyebrow?: string; children: ReactNode; action?: ReactNode }) {

@@ -1,3 +1,5 @@
+//formatters.ts
+
 export function money(value: number) {
   return `S/ ${new Intl.NumberFormat('es-PE', { maximumFractionDigits: 0 }).format(Math.round(value))}`;
 }

@@ -1,3 +1,5 @@
+//MiniMetric.tsx
+
 export function MiniMetric({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-muted/70 p-3">

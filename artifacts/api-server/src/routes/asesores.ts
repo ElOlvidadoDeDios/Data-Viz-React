@@ -1,3 +1,5 @@
+//routes/asesores.ts
+
 import { Router, Request, Response } from "express";
 import sql from "mssql/msnodesqlv8.js";
 
@@ -38,12 +40,25 @@ router.get(["/asesores/:periodo", "/api/asesores/:periodo"], async (req: Request
             WHERE Periodo = @periodo 
             GROUP BY IdSAsesor
         ),
+        -- 🚀 OPTIMIZACIÓN: Pre-agrupamos metas para evitar el problema N+1
+        CTE_Metas_Agencia AS (
+            SELECT IdSAgencia, ISNULL(SUM(Mora9Meta), 0.10) AS MetaMoraCPP, ISNULL(SUM(Mora31Meta), 0.05) AS MetaMoraDeficiente
+            FROM dm_productividad.dbo.fct_stock_manubl_agencia_month
+            WHERE Periodo = @periodo GROUP BY IdSAgencia
+        ),
+        CTE_Metas_Asesor AS (
+            SELECT IdSAsesor, ISNULL(SUM(CarteraInicial), 0) AS CarteraInicial
+            FROM dm_productividad.dbo.fct_stock_manubl_asesor_month
+            WHERE Periodo = @periodo GROUP BY IdSAsesor
+        ),
         CTE_MetasStock_Com AS (
             SELECT A.IdSAsesor, A.IdSAgencia,
-                ISNULL((SELECT SUM(Mora9Meta) FROM dm_productividad.dbo.fct_stock_manubl_agencia_month M WHERE M.IdSAgencia = A.IdSAgencia AND M.Periodo = @periodo), 0.10) AS MetaMoraCPP,
-                ISNULL((SELECT SUM(Mora31Meta) FROM dm_productividad.dbo.fct_stock_manubl_agencia_month M WHERE M.IdSAgencia = A.IdSAgencia AND M.Periodo = @periodo), 0.05) AS MetaMoraDeficiente,
-                ISNULL((SELECT SUM(CarteraInicial) FROM dm_productividad.dbo.fct_stock_manubl_asesor_month CI WHERE CI.IdSAsesor = A.IdSAsesor AND CI.Periodo = @periodo), 0) AS CarteraInicial
+                ISNULL(MA.MetaMoraCPP, 0.10) AS MetaMoraCPP,
+                ISNULL(MA.MetaMoraDeficiente, 0.05) AS MetaMoraDeficiente,
+                ISNULL(MAS.CarteraInicial, 0) AS CarteraInicial
             FROM CTE_Asesores_Com A
+            LEFT JOIN CTE_Metas_Agencia MA ON A.IdSAgencia = MA.IdSAgencia
+            LEFT JOIN CTE_Metas_Asesor MAS ON A.IdSAsesor = MAS.IdSAsesor
         )
         SELECT 
             CASE A.IdSAgencia WHEN '01' THEN 'Wanchaq' WHEN '02' THEN 'San Jerónimo' WHEN '03' THEN 'Quillabamba' WHEN '04' THEN 'Sicuani' WHEN '05' THEN 'Molino' WHEN '06' THEN 'Juliaca' WHEN '07' THEN 'Lima Los Olivos' WHEN '08' THEN 'Tica Tica' WHEN '09' THEN 'Magisterio' WHEN '10' THEN 'Lima SJL' WHEN '11' THEN 'Chiclayo' WHEN '12' THEN 'Arequipa' WHEN '13' THEN 'Pucallpa' ELSE 'Otra Agencia' END AS agency,

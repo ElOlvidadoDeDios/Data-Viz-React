@@ -1,3 +1,5 @@
+//GaugeChart.tsx
+
 export function GaugeChart({ pct, color }: { pct: number, color: string }) {
   const radius = 85;
   const strokeWidth = 24;

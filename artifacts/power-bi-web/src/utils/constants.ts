@@ -1,3 +1,5 @@
+//constants.ts
+
 export type View = 'gerencia' | 'supervision' | 'agencia' | 'asesores' | 'colocaciones' | 'diaria';
 export type Filters = { period: string; agency: string; advisor: string; day: string };
 
